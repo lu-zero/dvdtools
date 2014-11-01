@@ -3,7 +3,7 @@ PKGCONF_MODULES = dvdread libavformat libavutil
 CFLAGS = -Wall -g
 CFLAGS += `$(PKGCONF) --cflags $(PKGCONF_MODULES)`
 LDFLAGS = `$(PKGCONF) --libs $(PKGCONF_MODULES)`
-PROGRAMS = dump_ifo dump_vobu
+PROGRAMS = dump_ifo dump_vobu rewrite_ifo
 
 all: $(PROGRAMS)
 
@@ -15,6 +15,9 @@ dump_ifo: dump_ifo.c
 
 
 dump_vobu: dump_vobu.c
+	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS)
+
+rewrite_ifo: rewrite_ifo.c
 	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS)
 
 
