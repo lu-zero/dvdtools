@@ -476,19 +476,43 @@ static void write_multichannel_ext(AVIOContext *pb, multichannel_ext_t *ext)
 
 static void ifo_write_pgci_ut(IFOContext *ifo)
 {
-    unsigned int i, size;
+    unsigned int i;
     pgci_ut_t *pgci_ut = ifo->i->pgci_ut;
 
     avio_wb16(ifo->pb, pgci_ut->nr_of_lus);
     avio_wb16(ifo->pb, 0);
     avio_wb32(ifo->pb, pgci_ut->last_byte);
 
-    size = pgci_ut->nr_of_lus * PGCI_LU_SIZE;
-
     for (i = 0; i < pgci_ut->nr_of_lus; i++) {
         avio_wb16(ifo->pb, pgci_ut->lu[i].lang_code);
+        avio_w8(ifo->pb, pgci_ut->lu[i].lang_extension);
         avio_w8(ifo->pb, pgci_ut->lu[i].exists);
         avio_wb32(ifo->pb, pgci_ut->lu[i].lang_start_byte);
+
+        // pgcit_t
+        avio_wb16(ifo->pb, pgci_ut->lu[i].pgcit->nr_of_pgci_srp);
+        avio_wb16(ifo->pb, 0);
+        avio_wb32(ifo->pb, pgci_ut->lu[i].pgcit->last_byte);
+        { //pgci_srp_t
+            uint8_t buffer;
+            PutBitContext s;
+
+            init_put_bits(&s, &buffer, 1);
+
+            avio_w8(ifo->pb, pgci_ut->lu[i].pgcit->pgci_srp->entry_id);
+
+            put_bits(&s, 2, pgci_ut->lu[i].pgcit->pgci_srp->block_mode);
+            put_bits(&s, 2, pgci_ut->lu[i].pgcit->pgci_srp->block_type);
+            put_bits(&s, 4, pgci_ut->lu[i].pgcit->pgci_srp->unknown1);
+            flush_put_bits(&s);
+            avio_w8(ifo->pb, buffer);
+
+            avio_wb16(ifo->pb, pgci_ut->lu[i].pgcit->pgci_srp->ptl_id_mask);
+            avio_wb32(ifo->pb, pgci_ut->lu[i].pgcit->pgci_srp->pgc_start_byte);
+
+            write_pgc(ifo->pb, 0, pgci_ut->lu[i].pgcit->pgci_srp->pgc);
+        }
+        avio_wb32(ifo->pb, pgci_ut->lu[i].pgcit->ref_count);
     }
 
     // WIP
