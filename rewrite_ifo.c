@@ -437,10 +437,10 @@ static void write_video_attr(AVIOContext *pb, video_attr_t *attr)
 static void write_multichannel_ext(AVIOContext *pb, multichannel_ext_t *ext)
 {
     unsigned int i;
-    uint8_t buffer[sizeof(ext)];
+    uint8_t buffer[sizeof(*ext)];
     PutBitContext s;
 
-    init_put_bits(&s, buffer, sizeof(ext));
+    init_put_bits(&s, buffer, sizeof(*ext));
 
     put_bits(&s, 7, ext->zero1);
     put_bits(&s, 1, ext->ach0_gme);
@@ -466,10 +466,12 @@ static void write_multichannel_ext(AVIOContext *pb, multichannel_ext_t *ext)
     put_bits(&s, 1, ext->ach4_gmBe);
     put_bits(&s, 1, ext->ach4_seBe);
 
-    for (i = 0; i < 19; i++) //FIXME
-        put_bits(&s, 1, 0);  //FIXME
+    for (i = 0; i < 19; i++)
+        put_bits(&s, 8, 0);
 
     flush_put_bits(&s);
+
+    avio_write(pb, buffer, sizeof(*ext));
 }
 
 static void ifo_write_pgci_ut(IFOContext *ifo)
