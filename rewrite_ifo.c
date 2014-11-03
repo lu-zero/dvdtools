@@ -163,12 +163,49 @@ typedef struct PGCContext {
 
 static void write_dvd_time(AVIOContext *pb, dvd_time_t *time)
 {
-
+    avio_w8(pb, time->hour);
+    avio_w8(pb, time->minute);
+    avio_w8(pb, time->second);
+    avio_w8(pb, time->frame_u);
 }
 
 static void write_user_ops(AVIOContext *pb, user_ops_t *ops)
 {
+    PutBitContext s;
+    uint8_t buf[sizeof(*ops)];
 
+    init_put_bits(&s, buf, sizeof(buf));
+
+    put_bits(&s, 7, ops->zero);
+    put_bits(&s, 1, ops->video_pres_mode_change);
+    put_bits(&s, 1, ops->karaoke_audio_pres_mode_change);
+    put_bits(&s, 1, ops->angle_change);
+    put_bits(&s, 1, ops->subpic_stream_change);
+    put_bits(&s, 1, ops->audio_stream_change);
+    put_bits(&s, 1, ops->pause_on);
+    put_bits(&s, 1, ops->still_off);
+    put_bits(&s, 1, ops->button_select_or_activate);
+    put_bits(&s, 1, ops->resume);
+    put_bits(&s, 1, ops->chapter_menu_call);
+    put_bits(&s, 1, ops->angle_menu_call);
+    put_bits(&s, 1, ops->audio_menu_call);
+    put_bits(&s, 1, ops->subpic_menu_call);
+    put_bits(&s, 1, ops->root_menu_call);
+    put_bits(&s, 1, ops->title_menu_call);
+    put_bits(&s, 1, ops->backward_scan);
+    put_bits(&s, 1, ops->forward_scan);
+    put_bits(&s, 1, ops->next_pg_search);
+    put_bits(&s, 1, ops->prev_or_top_pg_search);
+    put_bits(&s, 1, ops->time_or_chapter_search);
+    put_bits(&s, 1, ops->go_up);
+    put_bits(&s, 1, ops->stop);
+    put_bits(&s, 1, ops->title_play);
+    put_bits(&s, 1, ops->chapter_search_or_play);
+    put_bits(&s, 1, ops->title_or_time_play);
+
+    flush_put_bits(&s);
+
+    avio_write(pb, buf, sizeof(buf));
 }
 
 static void write_command_tbl(AVIOContext *pb, int64_t offset,
