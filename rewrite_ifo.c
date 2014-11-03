@@ -171,6 +171,93 @@ static void write_user_ops(AVIOContext *pb, user_ops_t *ops)
 
 }
 
+static void write_command_tbl(AVIOContext *pb, int64_t offset,
+                              pgc_command_tbl_t *cmd_tbl)
+{
+
+    avio_seek(pb, offset, SEEK_SET);
+
+    avio_wb16(pb, cmd_tbl->nr_of_pre);
+    avio_wb16(pb, cmd_tbl->nr_of_post);
+    avio_wb16(pb, cmd_tbl->nr_of_cell);
+    avio_wb16(pb, 0);
+
+    if (cmd_tbl->nr_of_pre)
+        avio_write(pb, (uint8_t *)cmd_tbl->pre_cmds,
+                   cmd_tbl->nr_of_pre * COMMAND_DATA_SIZE);
+
+    if (cmd_tbl->nr_of_post)
+        avio_write(pb, (uint8_t *)cmd_tbl->post_cmds,
+                   cmd_tbl->nr_of_post * COMMAND_DATA_SIZE);
+
+    if (cmd_tbl->nr_of_cell)
+        avio_write(pb, (uint8_t *)cmd_tbl->cell_cmds,
+                   cmd_tbl->nr_of_cell * COMMAND_DATA_SIZE);
+}
+
+static void write_pgc_program_map(AVIOContext *pb, int64_t offset,
+                                  int nb, pgc_program_map_t *map)
+{
+    avio_seek(pb, offset, SEEK_SET);
+
+    avio_write(pb, map, nb * sizeof(*map));
+}
+
+static void write_cell_playback_internal(AVIOContext *pb,
+                                         cell_playback_t *cell)
+{
+    PutBitContext s;
+    uint8_t buf[sizeof(*cell)];
+
+    init_put_bits(&s, buf, sizeof(buf));
+
+    put_bits(&s, 2, cell->block_mode);
+    put_bits(&s, 2, cell->block_type);
+    put_bits(&s, 1, cell->seamless_play);
+    put_bits(&s, 1, cell->interleaved);
+    put_bits(&s, 1, cell->stc_discontinuity);
+    put_bits(&s, 1, cell->seamless_angle);
+    put_bits(&s, 1, cell->playback_mode);
+    put_bits(&s, 1, cell->restricted);
+    put_bits(&s, 6, cell->unknown2);
+
+    flush_put_bits(&s);
+
+    avio_write(pb, buf, sizeof(buf));
+
+    avio_w8(pb, cell->still_time);
+    avio_w8(pb, cell->cell_cmd_nr);
+    write_dvd_time(pb, &cell->playback_time);
+
+    avio_wb32(pb, cell->first_sector);
+    avio_wb32(pb, cell->first_ilvu_end_sector);
+    avio_wb32(pb, cell->last_vobu_start_sector);
+    avio_wb32(pb, cell->last_sector);
+}
+
+static void write_cell_playback(AVIOContext *pb, int64_t offset,
+                                int nb, cell_playback_t *cell)
+{
+    int i;
+    avio_seek(pb, offset, SEEK_SET);
+
+    for (i = 0; i < nb; i++)
+        write_cell_playback_internal(pb, cell + i);
+}
+static void write_cell_position(AVIOContext *pb, int64_t offset,
+                                int nb, cell_position_t *cell)
+{
+    int i;
+
+    avio_seek(pb, offset, SEEK_SET);
+
+    for (i = 0; i < nb; i++) {
+        avio_wb16(pb, cell[i].vob_id_nr);
+        avio_w8(pb, 0);
+        avio_w8(pb, cell[i].cell_nr);
+    }
+}
+
 static void write_pgc(AVIOContext *pb, int64_t offset, pgc_t *pgc)
 {
     int i;
@@ -205,7 +292,21 @@ static void write_pgc(AVIOContext *pb, int64_t offset, pgc_t *pgc)
     avio_wb16(pb, pgc->cell_playback_offset);
     avio_wb16(pb, pgc->cell_position_offset);
 
+    if (pgc->command_tbl)
+        write_command_tbl(pb, offset + pgc->command_tbl_offset,
+                          pgc->command_tbl);
 
+    if (pgc->program_map)
+        write_pgc_program_map(pb, offset + pgc->program_map_offset,
+                              pgc->nr_of_programs, pgc->program_map);
+
+    if (pgc->cell_playback)
+        write_cell_playback(pb, offset + pgc->cell_playback_offset,
+                            pgc->nr_of_cells, pgc->cell_playback);
+
+    if (pgc->cell_position)
+        write_cell_position(pb, offset + pgc->cell_position_offset,
+                            pgc->nr_of_cells, pgc->cell_position);
 
 }
 
