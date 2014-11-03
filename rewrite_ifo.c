@@ -70,6 +70,39 @@ static inline void put_bits(PutBitContext *s, int n, unsigned int value)
     s->bit_left = bit_left;
 }
 
+static void put_bits32(PutBitContext *s, uint32_t value)
+{
+    int lo = value & 0xffff;
+    int hi = value >> 16;
+#ifdef BITSTREAM_WRITER_LE
+    put_bits(s, 16, lo);
+    put_bits(s, 16, hi);
+#else
+    put_bits(s, 16, hi);
+    put_bits(s, 16, lo);
+#endif
+}
+
+static inline void flush_put_bits(PutBitContext *s)
+{
+#ifndef BITSTREAM_WRITER_LE
+    if (s->bit_left < 32)
+        s->bit_buf <<= s->bit_left;
+#endif
+    while (s->bit_left < 32) {
+        /* XXX: should test end of buffer */
+#ifdef BITSTREAM_WRITER_LE
+        *s->buf_ptr++ = s->bit_buf;
+        s->bit_buf  >>= 8;
+#else
+        *s->buf_ptr++ = s->bit_buf >> 24;
+        s->bit_buf  <<= 8;
+#endif
+        s->bit_left  += 8;
+    }
+    s->bit_left = 32;
+    s->bit_buf  = 0;
+}
 
 static void help(char *name)
 {
