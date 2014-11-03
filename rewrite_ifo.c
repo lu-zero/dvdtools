@@ -332,26 +332,127 @@ static void ifo_write_vts_pgcit(AVIOContext *pb, int64_t offset,
 
 static void write_audio_attr(AVIOContext *pb, audio_attr_t *attr)
 {
+    uint8_t buffer[sizeof(attr)];
+    PutBitContext s;
 
+    init_put_bits(&s, buffer, sizeof(attr));
+
+    put_bits(&s, 3, attr->audio_format);
+    put_bits(&s, 1, attr->multichannel_extension);
+    put_bits(&s, 2, attr->lang_type);
+    put_bits(&s, 2, attr->application_mode);
+
+    put_bits(&s, 2, attr->quantization);
+    put_bits(&s, 2, attr->sample_frequency);
+    put_bits(&s, 1, attr->unknown1);
+    put_bits(&s, 3, attr->channels);
+
+    put_bits(&s, 16, attr->lang_code);
+    put_bits(&s, 8, attr->lang_extension);
+    put_bits(&s, 8, attr->code_extension);
+    put_bits(&s, 8, attr->unknown3);
+
+    put_bits(&s, 1, attr->app_info.karaoke.unknown4);
+    put_bits(&s, 3, attr->app_info.karaoke.channel_assignment);
+    put_bits(&s, 2, attr->app_info.karaoke.version);
+    put_bits(&s, 1, attr->app_info.karaoke.mc_intro);
+    put_bits(&s, 1, attr->app_info.karaoke.mode);
+
+    flush_put_bits(&s);
+
+    avio_write(pb, buffer, sizeof(attr));
 }
 
 static void write_subp_attr(AVIOContext *pb, subp_attr_t *attr)
 {
-
+    int8_t *ptr = (int8_t*)attr;
+    avio_w8(pb, *ptr);
+    avio_w8(pb, 0);
+    avio_wb16(pb, attr->lang_code);
+    avio_w8(pb, attr->lang_extension);
+    avio_w8(pb, attr->code_extension);
 }
 
 static void write_video_attr(AVIOContext *pb, video_attr_t *attr)
 {
+    uint8_t buffer[sizeof(attr)];
+    PutBitContext s;
 
+    init_put_bits(&s, buffer, sizeof(attr));
+
+    put_bits(&s, 2, attr->mpeg_version);
+    put_bits(&s, 2, attr->video_format);
+    put_bits(&s, 2, attr->display_aspect_ratio);
+    put_bits(&s, 2, attr->permitted_df);
+    put_bits(&s, 1, attr->line21_cc_1);
+    put_bits(&s, 1, attr->line21_cc_2);
+    put_bits(&s, 1, attr->unknown1);
+    put_bits(&s, 1, attr->bit_rate);
+    put_bits(&s, 2, attr->picture_size);
+    put_bits(&s, 1, attr->letterboxed);
+    put_bits(&s, 1, attr->film_mode);
+
+    flush_put_bits(&s);
+
+    avio_write(pb, buffer, sizeof(attr));
 }
 
 static void write_multichannel_ext(AVIOContext *pb, multichannel_ext_t *ext)
 {
+    unsigned int i;
+    uint8_t buffer[sizeof(ext)];
+    PutBitContext s;
 
+    init_put_bits(&s, buffer, sizeof(ext));
+
+    put_bits(&s, 7, ext->zero1);
+    put_bits(&s, 1, ext->ach0_gme);
+
+    put_bits(&s, 7, ext->zero2);
+    put_bits(&s, 1, ext->ach1_gme);
+
+    put_bits(&s, 4, ext->zero3);
+    put_bits(&s, 1, ext->ach2_gv1e);
+    put_bits(&s, 1, ext->ach2_gv2e);
+    put_bits(&s, 1, ext->ach2_gm1e);
+    put_bits(&s, 1, ext->ach2_gm2e);
+
+    put_bits(&s, 4, ext->zero4);
+    put_bits(&s, 1, ext->ach3_gv1e);
+    put_bits(&s, 1, ext->ach3_gv2e);
+    put_bits(&s, 1, ext->ach3_gmAe);
+    put_bits(&s, 1, ext->ach3_se2e);
+
+    put_bits(&s, 4, ext->zero5);
+    put_bits(&s, 1, ext->ach4_gv1e);
+    put_bits(&s, 1, ext->ach4_gv2e);
+    put_bits(&s, 1, ext->ach4_gmBe);
+    put_bits(&s, 1, ext->ach4_seBe);
+
+    for (i = 0; i < 19; i++) //FIXME
+        put_bits(&s, 1, 0);  //FIXME
+
+    flush_put_bits(&s);
 }
 
 static void ifo_write_pgci_ut(IFOContext *ifo)
 {
+    unsigned int i, size;
+    pgci_ut_t *pgci_ut = ifo->i->pgci_ut;
+
+    avio_wb16(ifo->pb, pgci_ut->nr_of_lus);
+    avio_wb16(ifo->pb, 0);
+    avio_wb32(ifo->pb, pgci_ut->last_byte);
+
+    size = pgci_ut->nr_of_lus * PGCI_LU_SIZE;
+
+    for (i = 0; i < pgci_ut->nr_of_lus; i++) {
+        avio_wb16(ifo->pb, pgci_ut->lu[i].lang_code);
+        avio_w8(ifo->pb, pgci_ut->lu[i].exists);
+        avio_wb32(ifo->pb, pgci_ut->lu[i].lang_start_byte);
+    }
+
+    // WIP
 
 }
 
