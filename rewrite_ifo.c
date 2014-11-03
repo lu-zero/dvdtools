@@ -8,6 +8,7 @@
 
 #include <libavutil/intreadwrite.h>
 #include <libavformat/avio.h>
+#include <libavformat/avformat.h>
 
 #define DVD_BLOCK_LEN 2048
 
@@ -674,6 +675,8 @@ static int ifo_write_vts(IFOContext *ifo)
 
     avio_flush(ifo->pb);
 
+    avio_close(ifo->pb);
+
     return 0;
 }
 
@@ -696,6 +699,8 @@ int main(int argc, char **argv)
     dvd_reader_t *dvd;
     int idx = 0;
 
+    av_register_all();
+
     if (argc < 3)
         help(argv[0]);
 
@@ -707,5 +712,5 @@ int main(int argc, char **argv)
 
     ifo->i = ifoOpen(dvd, idx);
 
-    return ifo_write(ifo, !!idx);
+    return ifo_write(ifo, !idx);
 }
