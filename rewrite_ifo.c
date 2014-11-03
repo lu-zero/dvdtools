@@ -519,23 +519,42 @@ static void ifo_write_pgci_ut(IFOContext *ifo)
 
 }
 
-static void ifo_write_vts_tmapt(IFOContext *ifo)
+static void write_tmap(AVIOContext *pb, int64_t offset,
+                       vts_tmap_t *tmap)
 {
+    int i;
 
+    avio_seek(pb, offset, SEEK_SET);
+
+    avio_w8(pb, tmap->tmu);
+    avio_w8(pb, 0);
+    avio_wb16(pb, tmap->nr_of_entries);
+
+    for (i = 0; i < tmap->nr_of_entries; i++)
+        avio_wb32(pb, tmap->map_ent[i]);
 }
 
-static void ifo_write_c_adt(IFOContext *ifo)
+static void ifo_write_vts_tmapt(AVIOContext *pb, int64_t offset,
+                                vts_tmapt_t *vts_tmapt)
 {
+    int i;
 
+    avio_seek(pb, offset, SEEK_SET);
+
+    avio_wb16(pb, vts_tmapt->nr_of_tmaps);
+    avio_wb16(pb, 0);
+    avio_wb32(pb, vts_tmapt->last_byte);
+
+    for (i = 0; i < vts_tmapt->nr_of_tmaps; i++)
+        avio_wb32(pb, vts_tmapt->tmap_offset[i]);
+
+    for (i = 0; i < vts_tmapt->nr_of_tmaps; i++)
+        write_tmap(pb, offset + vts_tmapt->tmap_offset[i],
+                   vts_tmapt->tmap + i);
 }
 
-static void ifo_write_vobu_admap(IFOContext *ifo)
-{
-
-}
-
-static void ifo_write_title_c_adt(AVIOContext *pb, int64_t offset,
-                                  c_adt_t *c_adt)
+static void ifo_write_c_adt(AVIOContext *pb, int64_t offset,
+                            c_adt_t *c_adt)
 {
     int i, map_size;
 
@@ -556,8 +575,8 @@ static void ifo_write_title_c_adt(AVIOContext *pb, int64_t offset,
     }
 }
 
-static void ifo_write_title_vobu_admap(AVIOContext *pb, int64_t offset,
-                                       vobu_admap_t *vobu_admap)
+static void ifo_write_vobu_admap(AVIOContext *pb, int64_t offset,
+                                 vobu_admap_t *vobu_admap)
 {
     int i, map_size;
 
@@ -655,16 +674,22 @@ static int ifo_write_vts(IFOContext *ifo)
         ifo_write_vts_pgcit(pb, vtsi->vts_pgcit * DVD_BLOCK_LEN, ifo->i->vts_pgcit);
 
     ifo_write_pgci_ut(ifo);
-    ifo_write_vts_tmapt(ifo);
-    ifo_write_c_adt(ifo);
-    ifo_write_vobu_admap(ifo);
+    ifo_write_vts_tmapt(pb, vtsi->vts_tmapt * DVD_BLOCK_LEN,
+                        ifo->i->vts_tmapt);
+
+    if (ifo->i->menu_c_adt)
+        ifo_write_c_adt(pb, vtsi->vtsm_c_adt * DVD_BLOCK_LEN,
+                        ifo->i->vts_c_adt);
+    if (ifo->i->menu_vobu_admap)
+        ifo_write_vobu_admap(pb, vtsi->vtsm_vobu_admap * DVD_BLOCK_LEN,
+                             ifo->i->menu_vobu_admap);
 
     if (vtsi->vts_c_adt)
-        ifo_write_title_c_adt(pb, vtsi->vts_c_adt * DVD_BLOCK_LEN,
-                              ifo->i->vts_c_adt);
+        ifo_write_c_adt(pb, vtsi->vts_c_adt * DVD_BLOCK_LEN,
+                        ifo->i->vts_c_adt);
     if (vtsi->vts_vobu_admap)
-        ifo_write_title_vobu_admap(pb, vtsi->vts_vobu_admap * DVD_BLOCK_LEN,
-                                   ifo->i->vts_vobu_admap);
+        ifo_write_vobu_admap(pb, vtsi->vts_vobu_admap * DVD_BLOCK_LEN,
+                             ifo->i->vts_vobu_admap);
 
     avio_flush(ifo->pb);
 
