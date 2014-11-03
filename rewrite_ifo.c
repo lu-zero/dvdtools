@@ -508,14 +508,41 @@ static void ifo_write_vobu_admap(IFOContext *ifo)
 
 }
 
-static void ifo_write_title_c_adt(IFOContext *ifo)
+static void ifo_write_title_c_adt(AVIOContext *pb, int64_t offset,
+                                  c_adt_t *c_adt)
 {
+    int i, map_size;
 
+    map_size = (c_adt->last_byte + 1 - C_ADT_SIZE) / sizeof(cell_adr_t);
+
+    avio_seek(pb, offset, SEEK_SET);
+
+    avio_wb16(pb, c_adt->nr_of_vobs);
+    avio_wb16(pb, 0);
+    avio_wb32(pb, c_adt->last_byte);
+
+    for (i = 0; i < map_size; i++) {
+        avio_wb16(pb, c_adt->cell_adr_table[i].vob_id);
+        avio_w8(pb, c_adt->cell_adr_table[i].cell_id);
+        avio_w8(pb, 0);
+        avio_wb32(pb, c_adt->cell_adr_table[i].start_sector);
+        avio_wb32(pb, c_adt->cell_adr_table[i].last_sector);
+    }
 }
 
-static void ifo_write_title_vobu_admap(IFOContext *ifo)
+static void ifo_write_title_vobu_admap(AVIOContext *pb, int64_t offset,
+                                       vobu_admap_t *vobu_admap)
 {
+    int i, map_size;
 
+    map_size = (vobu_admap->last_byte + 1 - VOBU_ADMAP_SIZE) / sizeof(uint32_t);
+
+    avio_seek(pb, offset, SEEK_SET);
+
+    avio_wb32(pb, vobu_admap->last_byte);
+
+    for (i = 0; i < map_size; i++)
+        avio_wb32(pb, vobu_admap->vobu_start_sectors[i]);
 }
 
 static int ifo_write_vts(IFOContext *ifo)
@@ -607,9 +634,11 @@ static int ifo_write_vts(IFOContext *ifo)
     ifo_write_vobu_admap(ifo);
 
     if (vtsi->vts_c_adt)
-        ifo_write_title_c_adt(ifo);
+        ifo_write_title_c_adt(pb, vtsi->vts_c_adt * DVD_BLOCK_LEN,
+                              ifo->i->vts_c_adt);
     if (vtsi->vts_vobu_admap)
-        ifo_write_title_vobu_admap(ifo);
+        ifo_write_title_vobu_admap(pb, vtsi->vts_vobu_admap * DVD_BLOCK_LEN,
+                                   ifo->i->vts_vobu_admap);
 
     avio_flush(ifo->pb);
 
