@@ -348,8 +348,8 @@ static void write_pgc(AVIOContext *pb, int64_t offset, pgc_t *pgc)
 }
 
 
-static void ifo_write_vts_pgcit(AVIOContext *pb, int64_t offset,
-                                pgcit_t *pgcit)
+static void ifo_write_pgcit(AVIOContext *pb, int64_t offset,
+                            pgcit_t *pgcit)
 {
     int i; //, nb_pgc;
 //    int64_t pos = avio_tell(pb);
@@ -474,49 +474,29 @@ static void write_multichannel_ext(AVIOContext *pb, multichannel_ext_t *ext)
     avio_write(pb, buffer, sizeof(*ext));
 }
 
-static void ifo_write_pgci_ut(IFOContext *ifo)
+static void write_pgci_lu(AVIOContext *pb, int64_t offset, pgci_lu_t *lu)
 {
-    unsigned int i;
-    pgci_ut_t *pgci_ut = ifo->i->pgci_ut;
+    avio_wb16(pb, lu->lang_code);
+    avio_w8(pb, lu->lang_extension);
+    avio_w8(pb, lu->exists);
+    avio_wb32(pb, lu->lang_start_byte);
 
-    avio_wb16(ifo->pb, pgci_ut->nr_of_lus);
-    avio_wb16(ifo->pb, 0);
-    avio_wb32(ifo->pb, pgci_ut->last_byte);
+    ifo_write_pgcit(pb, offset + lu->lang_start_byte, lu->pgcit);
+}
 
-    for (i = 0; i < pgci_ut->nr_of_lus; i++) {
-        avio_wb16(ifo->pb, pgci_ut->lu[i].lang_code);
-        avio_w8(ifo->pb, pgci_ut->lu[i].lang_extension);
-        avio_w8(ifo->pb, pgci_ut->lu[i].exists);
-        avio_wb32(ifo->pb, pgci_ut->lu[i].lang_start_byte);
+static void ifo_write_pgci_ut(AVIOContext *pb, int64_t offset,
+                              pgci_ut_t *pgci_ut)
+{
+    int i;
 
-        // pgcit_t
-        avio_wb16(ifo->pb, pgci_ut->lu[i].pgcit->nr_of_pgci_srp);
-        avio_wb16(ifo->pb, 0);
-        avio_wb32(ifo->pb, pgci_ut->lu[i].pgcit->last_byte);
-        { //pgci_srp_t
-            uint8_t buffer;
-            PutBitContext s;
+    avio_seek(pb, offset, SEEK_SET);
 
-            init_put_bits(&s, &buffer, 1);
+    avio_wb16(pb, pgci_ut->nr_of_lus);
+    avio_wb16(pb, 0);
+    avio_wb32(pb, pgci_ut->last_byte);
 
-            avio_w8(ifo->pb, pgci_ut->lu[i].pgcit->pgci_srp->entry_id);
-
-            put_bits(&s, 2, pgci_ut->lu[i].pgcit->pgci_srp->block_mode);
-            put_bits(&s, 2, pgci_ut->lu[i].pgcit->pgci_srp->block_type);
-            put_bits(&s, 4, pgci_ut->lu[i].pgcit->pgci_srp->unknown1);
-            flush_put_bits(&s);
-            avio_w8(ifo->pb, buffer);
-
-            avio_wb16(ifo->pb, pgci_ut->lu[i].pgcit->pgci_srp->ptl_id_mask);
-            avio_wb32(ifo->pb, pgci_ut->lu[i].pgcit->pgci_srp->pgc_start_byte);
-
-            write_pgc(ifo->pb, 0, pgci_ut->lu[i].pgcit->pgci_srp->pgc);
-        }
-        avio_wb32(ifo->pb, pgci_ut->lu[i].pgcit->ref_count);
-    }
-
-    // WIP
-
+    for (i = 0; i < pgci_ut->nr_of_lus; i++)
+        write_pgci_lu(pb, offset, pgci_ut->lu + i);
 }
 
 static void write_tmap(AVIOContext *pb, int64_t offset,
@@ -671,9 +651,10 @@ static int ifo_write_vts(IFOContext *ifo)
         ifo_write_vts_ppt_srp(pb, vtsi->vts_ptt_srpt * DVD_BLOCK_LEN, ifo->i->vts_ptt_srpt);
 
     if (vtsi->vts_pgcit)
-        ifo_write_vts_pgcit(pb, vtsi->vts_pgcit * DVD_BLOCK_LEN, ifo->i->vts_pgcit);
+        ifo_write_pgcit(pb, vtsi->vts_pgcit * DVD_BLOCK_LEN, ifo->i->vts_pgcit);
 
-    ifo_write_pgci_ut(ifo);
+    ifo_write_pgci_ut(pb, vtsi->vtsm_pgci_ut * DVD_BLOCK_LEN,
+                      ifo->i->pgci_ut);
     ifo_write_vts_tmapt(pb, vtsi->vts_tmapt * DVD_BLOCK_LEN,
                         ifo->i->vts_tmapt);
 
