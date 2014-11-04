@@ -123,16 +123,20 @@ static int ifo_open(IFOContext **ifo, const char *path, int rw)
 static void ifo_write_vts_ppt_srp(AVIOContext *pb, int offset,
                                   vts_ptt_srpt_t *srpt)
 {
-    int i;
+    int i, map_size;
 
+    map_size = (srpt->last_byte + 1 - TT_SRPT_SIZE) / sizeof(int32_t);
     avio_seek(pb, offset, SEEK_SET);
 
     avio_wb16(pb, srpt->nr_of_srpts);
     avio_wb16(pb, 0);
     avio_wb32(pb, srpt->last_byte);
 
-    for (i = 0; i < srpt->nr_of_srpts; i++)
+    for (i = 0; i < srpt->nr_of_srpts; i++) //FIXME HACK!!!
         avio_wb32(pb, srpt->ttu_offset[i]);
+
+    for (; i < map_size; i++)
+        avio_wl32(pb, srpt->ttu_offset[i]);
 }
 
 static void write_pgci_srp(AVIOContext *pb, pgci_srp_t *pgci)
@@ -554,6 +558,7 @@ static void ifo_write_vobu_admap(AVIOContext *pb, int64_t offset,
                                  vobu_admap_t *vobu_admap)
 {
     int i, map_size;
+    int64_t pos;
 
     map_size = (vobu_admap->last_byte + 1 - VOBU_ADMAP_SIZE) / sizeof(uint32_t);
 
@@ -563,6 +568,10 @@ static void ifo_write_vobu_admap(AVIOContext *pb, int64_t offset,
 
     for (i = 0; i < map_size; i++)
         avio_wb32(pb, vobu_admap->vobu_start_sectors[i]);
+
+    pos = (avio_tell(pb) + DVD_BLOCK_LEN - 1) & (-DVD_BLOCK_LEN);
+    for (i = 0; i < pos; i++)
+        avio_w8(pb, 0);
 }
 
 static int ifo_write_vts(IFOContext *ifo)
