@@ -82,7 +82,7 @@ static void print_dsi(uint8_t *buf) {
 
 static void parse_nav_pack(AVIOContext *pb, int32_t *header_state)
 {
-    int size, startcode, len;
+    int size = MAX_SYNC_SIZE, startcode, len;
     uint8_t pci[NAV_PCI_SIZE];
     uint8_t dsi[NAV_DSI_SIZE];
 
@@ -94,7 +94,7 @@ static void parse_nav_pack(AVIOContext *pb, int32_t *header_state)
     len = avio_rb16(pb);
     if (startcode != PRIVATE_STREAM_2 ||
         len != NAV_DSI_SIZE) {
-        avio_skip(pb, size - 2);
+        avio_skip(pb, len - 2);
         return;
     }
     avio_read(pb, dsi, NAV_DSI_SIZE);
@@ -104,7 +104,7 @@ static void parse_nav_pack(AVIOContext *pb, int32_t *header_state)
 
 static int find_vobu(AVIOContext *pb)
 {
-    int size, startcode;
+    int size = MAX_SYNC_SIZE, startcode;
     int32_t header_state;
 
 redo:
