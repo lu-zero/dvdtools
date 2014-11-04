@@ -71,19 +71,6 @@ static inline void put_bits(PutBitContext *s, int n, unsigned int value)
     s->bit_left = bit_left;
 }
 
-static void put_bits32(PutBitContext *s, uint32_t value)
-{
-    int lo = value & 0xffff;
-    int hi = value >> 16;
-#ifdef BITSTREAM_WRITER_LE
-    put_bits(s, 16, lo);
-    put_bits(s, 16, hi);
-#else
-    put_bits(s, 16, hi);
-    put_bits(s, 16, lo);
-#endif
-}
-
 static inline void flush_put_bits(PutBitContext *s)
 {
 #ifndef BITSTREAM_WRITER_LE
@@ -352,7 +339,6 @@ static void ifo_write_pgcit(AVIOContext *pb, int64_t offset,
                             pgcit_t *pgcit)
 {
     int i; //, nb_pgc;
-//    int64_t pos = avio_tell(pb);
 
     avio_seek(pb, offset, SEEK_SET);
     avio_wb16(pb, pgcit->nr_of_pgci_srp);
@@ -584,7 +570,6 @@ static int ifo_write_vts(IFOContext *ifo)
     AVIOContext *pb  = ifo->pb;
     vtsi_mat_t *vtsi = ifo->i->vtsi_mat;
     int i;
-    int64_t pos;
 
     avio_printf(ifo->pb, "%s", "DVDVIDEO-VTS");
 
