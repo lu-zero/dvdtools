@@ -142,7 +142,7 @@ static void ifo_write_vts_ppt_srp(AVIOContext *pb, int offset,
 
     avio_wb16(pb, srpt->nr_of_srpts);
     avio_wb16(pb, 0);
-    avio_wb16(pb, srpt->last_byte);
+    avio_wb32(pb, srpt->last_byte);
 
     for (i = 0; i < srpt->nr_of_srpts; i++)
         avio_wb32(pb, srpt->ttu_offset[i]);
@@ -212,13 +212,12 @@ static void write_user_ops(AVIOContext *pb, user_ops_t *ops)
 static void write_command_tbl(AVIOContext *pb, int64_t offset,
                               pgc_command_tbl_t *cmd_tbl)
 {
-
     avio_seek(pb, offset, SEEK_SET);
 
     avio_wb16(pb, cmd_tbl->nr_of_pre);
     avio_wb16(pb, cmd_tbl->nr_of_post);
     avio_wb16(pb, cmd_tbl->nr_of_cell);
-    avio_wb16(pb, 0);
+    avio_wl16(pb, cmd_tbl->zero_1); //FIXME HACKISH
 
     if (cmd_tbl->nr_of_pre)
         avio_write(pb, (uint8_t *)cmd_tbl->pre_cmds,
@@ -245,7 +244,7 @@ static void write_cell_playback_internal(AVIOContext *pb,
                                          cell_playback_t *cell)
 {
     PutBitContext s;
-    uint8_t buf[sizeof(*cell)];
+    uint8_t buf[2];
 
     init_put_bits(&s, buf, sizeof(buf));
 
@@ -358,7 +357,7 @@ static void ifo_write_pgcit(AVIOContext *pb, int64_t offset,
     avio_seek(pb, offset, SEEK_SET);
     avio_wb16(pb, pgcit->nr_of_pgci_srp);
     avio_wb16(pb, 0);
-    avio_wb16(pb, pgcit->last_byte);
+    avio_wb32(pb, pgcit->last_byte);
 
     for (i = 0; i < pgcit->nr_of_pgci_srp; i++)
          write_pgci_srp(pb, pgcit->pgci_srp + i);
@@ -370,10 +369,10 @@ static void ifo_write_pgcit(AVIOContext *pb, int64_t offset,
 
 static void write_audio_attr(AVIOContext *pb, audio_attr_t *attr)
 {
-    uint8_t buffer[sizeof(attr)];
+    uint8_t buffer[sizeof(*attr)];
     PutBitContext s;
 
-    init_put_bits(&s, buffer, sizeof(attr));
+    init_put_bits(&s, buffer, sizeof(*attr));
 
     put_bits(&s, 3, attr->audio_format);
     put_bits(&s, 1, attr->multichannel_extension);
@@ -398,13 +397,22 @@ static void write_audio_attr(AVIOContext *pb, audio_attr_t *attr)
 
     flush_put_bits(&s);
 
-    avio_write(pb, buffer, sizeof(attr));
+    avio_write(pb, buffer, sizeof(*attr));
 }
 
 static void write_subp_attr(AVIOContext *pb, subp_attr_t *attr)
 {
-    int8_t *ptr = (int8_t*)attr;
-    avio_w8(pb, *ptr);
+    uint8_t buffer;
+    PutBitContext s;
+
+    init_put_bits(&s, &buffer, 1);
+    put_bits(&s, 3, attr->code_mode);
+    put_bits(&s, 3, attr->zero1);
+    put_bits(&s, 2, attr->type);
+
+    flush_put_bits(&s);
+    avio_w8(pb, buffer);
+
     avio_w8(pb, 0);
     avio_wb16(pb, attr->lang_code);
     avio_w8(pb, attr->lang_extension);
@@ -413,10 +421,10 @@ static void write_subp_attr(AVIOContext *pb, subp_attr_t *attr)
 
 static void write_video_attr(AVIOContext *pb, video_attr_t *attr)
 {
-    uint8_t buffer[sizeof(attr)];
+    uint8_t buffer[sizeof(*attr)];
     PutBitContext s;
 
-    init_put_bits(&s, buffer, sizeof(attr));
+    init_put_bits(&s, buffer, sizeof(*attr));
 
     put_bits(&s, 2, attr->mpeg_version);
     put_bits(&s, 2, attr->video_format);
@@ -432,7 +440,7 @@ static void write_video_attr(AVIOContext *pb, video_attr_t *attr)
 
     flush_put_bits(&s);
 
-    avio_write(pb, buffer, sizeof(attr));
+    avio_write(pb, buffer, sizeof(*attr));
 }
 
 static void write_multichannel_ext(AVIOContext *pb, multichannel_ext_t *ext)
@@ -576,6 +584,7 @@ static int ifo_write_vts(IFOContext *ifo)
     AVIOContext *pb  = ifo->pb;
     vtsi_mat_t *vtsi = ifo->i->vtsi_mat;
     int i;
+    int64_t pos;
 
     avio_printf(ifo->pb, "%s", "DVDVIDEO-VTS");
 
@@ -593,8 +602,10 @@ static int ifo_write_vts(IFOContext *ifo)
 
     avio_wb32(pb, vtsi->vtsi_last_byte);
 
+
     for (i = 0; i < 4 + 56; i++)
         avio_w8(pb, 0);
+
 
     avio_wb32(pb, vtsi->vtsm_vobs);
     avio_wb32(pb, vtsi->vtstt_vobs);
@@ -607,11 +618,13 @@ static int ifo_write_vts(IFOContext *ifo)
     avio_wb32(pb, vtsi->vts_c_adt);
     avio_wb32(pb, vtsi->vts_vobu_admap);
 
+
     for (i = 0; i < 24; i++)
         avio_w8(pb, 0);
 
     write_video_attr(pb, &vtsi->vtsm_video_attr);
     avio_w8(pb, 0);
+
 
     avio_w8(pb, vtsi->nr_of_vtsm_audio_streams);
     write_audio_attr(pb, &vtsi->vtsm_audio_attr);
@@ -620,6 +633,7 @@ static int ifo_write_vts(IFOContext *ifo)
 
     for (i = 0; i < 17; i++)
         avio_w8(pb, 0);
+
 
     avio_w8(pb, vtsi->nr_of_vtsm_subp_streams);
     write_subp_attr(pb, &vtsi->vtsm_subp_attr);
@@ -638,6 +652,7 @@ static int ifo_write_vts(IFOContext *ifo)
 
     for (i = 0; i < 17; i++)
         avio_w8(pb, 0);
+
 
     avio_w8(pb, vtsi->nr_of_vts_subp_streams);
     for (i = 0; i < 32; i++)
@@ -661,7 +676,7 @@ static int ifo_write_vts(IFOContext *ifo)
 
     if (ifo->i->menu_c_adt)
         ifo_write_c_adt(pb, vtsi->vtsm_c_adt * DVD_BLOCK_LEN,
-                        ifo->i->vts_c_adt);
+                        ifo->i->menu_c_adt);
     if (ifo->i->menu_vobu_admap)
         ifo_write_vobu_admap(pb, vtsi->vtsm_vobu_admap * DVD_BLOCK_LEN,
                              ifo->i->menu_vobu_admap);
@@ -672,6 +687,7 @@ static int ifo_write_vts(IFOContext *ifo)
     if (vtsi->vts_vobu_admap)
         ifo_write_vobu_admap(pb, vtsi->vts_vobu_admap * DVD_BLOCK_LEN,
                              ifo->i->vts_vobu_admap);
+
 
     avio_flush(ifo->pb);
 
@@ -708,7 +724,7 @@ int main(int argc, char **argv)
 
     idx = atoi(argv[2]);
 
-    ifo_open(&ifo, argv[3], AVIO_FLAG_WRITE);
+    ifo_open(&ifo, argv[3], AVIO_FLAG_READ_WRITE);
 
     ifo->i = ifoOpen(dvd, idx);
 
