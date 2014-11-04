@@ -87,7 +87,10 @@ static void parse_nav_pack(AVIOContext *pb, int32_t *header_state)
     uint8_t dsi[NAV_DSI_SIZE];
 
     avio_read(pb, pci, NAV_PCI_SIZE);
+    print_pci(pci);
+    printf("state %d\n", *header_state);
     startcode = find_next_start_code(pb, &size, header_state);
+    printf("code %d\n", startcode);
     len = avio_rb16(pb);
     if (startcode != PRIVATE_STREAM_2 ||
         len != NAV_DSI_SIZE) {
@@ -96,7 +99,6 @@ static void parse_nav_pack(AVIOContext *pb, int32_t *header_state)
     }
     avio_read(pb, dsi, NAV_DSI_SIZE);
 
-    print_pci(pci);
     print_dsi(dsi);
 }
 

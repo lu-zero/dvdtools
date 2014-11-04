@@ -1,6 +1,6 @@
 PKGCONF = pkgconf
 PKGCONF_MODULES = dvdread libavformat libavutil
-CFLAGS = -Wall -g
+CFLAGS = -Wall -g -fsanitize=address
 CFLAGS += `$(PKGCONF) --cflags $(PKGCONF_MODULES)`
 LDFLAGS = `$(PKGCONF) --libs $(PKGCONF_MODULES)`
 PROGRAMS = dump_ifo dump_vobu rewrite_ifo
