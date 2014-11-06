@@ -23,6 +23,13 @@
 
 #define MAX_SYNC_SIZE 100000
 
+typedef struct {
+    int64_t start, end;
+    uint32_t sector;
+    uint16_t vob_id;
+    uint8_t vob_cell_id;
+} VOBU;
+
 static void help(char *name)
 {
     fprintf(stderr, "%s <vob>\n"
@@ -102,7 +109,7 @@ static void parse_nav_pack(AVIOContext *pb, int32_t *header_state)
     print_dsi(dsi);
 }
 
-static int find_vobu(AVIOContext *pb)
+static int find_vobu(AVIOContext *pb, VOBU *vobus, int i)
 {
     int size = MAX_SYNC_SIZE, startcode;
     int32_t header_state;
@@ -121,10 +128,15 @@ redo:
     if (startcode == PRIVATE_STREAM_2) {
         int len = avio_rb16(pb);
         if (len == NAV_PCI_SIZE) {
-            printf("Sector: 0x%08"PRIx64"\n",
-                   (avio_tell(pb) - 44) / 2048);
 
-            parse_nav_pack(pb, &header_state);
+            vobus[i].sector = (avio_tell(pb) - 44) / 2048;
+            vobus[i].start = avio_tell(pb) - 44;
+            if (i) {
+                vobus[i - 1].end = vobus[i].start;
+            }
+           printf("Sector: 0x%08"PRIx64" %"PRId64"\n",
+                   vobus[i].sector, vobus[i].start);
+           parse_nav_pack(pb, &header_state);
             return 0;
          } else {
             avio_skip(pb, len);
@@ -135,17 +147,50 @@ redo:
     }
 }
 
+void write_vob(VOBU *vobu, AVIOContext *in)
+{
+    AVIOContext *out = NULL;
+    char outname[1024];
+    int ret, size;
+
+    snprintf(outname, sizeof(outname), "tmp-0x%08"PRIx32".vob", vobu->sector);
+
+    ret = avio_open(&out, outname, AVIO_FLAG_WRITE);
+
+    avio_seek(in, vobu->start, SEEK_SET);
+
+    size = vobu->end - vobu->start;
+
+    printf("S: %d %d\n", vobu->end, vobu->start);
+
+    while (size > 0) {
+        uint8_t buf[2048];
+        int n;
+        n = avio_read(in, buf, sizeof(buf));
+        if (n <= 0) {
+            fprintf(stderr, "OMGBBQ\n");
+            break;
+        }
+        avio_write(out, buf, n);
+        size -= n;
+    }
+
+    avio_flush(out);
+    avio_close(out);
+}
+
 int main(int argc, char *argv[])
 {
-    AVIOContext *pb = NULL;
-    int ret;
-
+    AVIOContext *in = NULL;
+    VOBU *vobus = NULL;
+    int ret, i = 0, nb_vobus, size = 1;
+    int64_t end;
     av_register_all();
 
     if (argc < 2)
         help(argv[0]);
 
-    ret = avio_open(&pb, argv[1], AVIO_FLAG_READ);
+    ret = avio_open(&in, argv[1], AVIO_FLAG_READ);
 
     if (ret < 0) {
         char errbuf[128];
@@ -155,7 +200,30 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    while (!find_vobu(pb));
+    end = avio_size(in);
+
+    if (av_reallocp_array(&vobus, size, sizeof(VOBU)) < 0)
+        return 1;
+
+    while (!find_vobu(in, vobus, i)) {
+        if (++i >= size) {
+            size *= 2;
+            if (av_reallocp_array(&vobus, size, sizeof(VOBU)) < 0)
+                return 1;
+        }
+    }
+
+    vobus[i--].end = end;
+
+    nb_vobus = i;
+
+    for (i = 0; i <= nb_vobus; i++) {
+        write_vob(vobus + i, in);
+    }
+
+    av_free(vobus);
+
+    avio_close(in);
 
     return 0;
 }
