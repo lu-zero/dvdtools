@@ -741,7 +741,47 @@ static void write_tt_srpt(AVIOContext *pb, int64_t offset,
         avio_w8(pb, tt_srpt->title[i].vts_ttn);
         avio_wb32(pb, tt_srpt->title[i].title_set_sector);
     }
+}
 
+static void write_ptl_mait_country(AVIOContext *pb,
+                                   ptl_mait_country_t *country)
+{
+    avio_wb16(pb, country->country_code);
+    avio_wb16(pb, 0);
+    avio_wb16(pb, country->pf_ptl_mai_start_byte);
+    avio_wb16(pb, 0);
+}
+
+static void write_pf_level(AVIOContext *pb, int64_t offset,
+                           pf_level_t *pf,
+                           int nr_of_vtss)
+{
+
+
+}
+
+static void write_ptl_mait(AVIOContext *pb, int64_t offset,
+                           ptl_mait_t *ptl_mait)
+{
+    int i, map_size;
+
+    map_size = (ptl_mait->last_byte + 1 - PTL_MAIT_SIZE) / PTL_MAIT_COUNTRY_SIZE;
+
+    avio_seek(pb, offset, SEEK_SET);
+
+    avio_wb16(pb, ptl_mait->nr_of_countries);
+    avio_wb16(pb, ptl_mait->nr_of_vtss);
+    avio_wb32(pb, ptl_mait-last_byte);
+
+    for (i = 0; i < ptl_mait->nr_of_countries; i++) {
+        write_ptl_mait_country(pb, ptl_mait->countries + i);
+    }
+    for (i = 0; i < ptl_mait->nr_of_countries; i++) {
+        write_pf_level(pb,
+                       offset + ptl_mait->countries[i].pf_ptl_mai_start_byte,
+                       ptl_mait->countries[i].pf_ptl_mai,
+                       ptl_mait->nr_of_vtss);
+    }
 }
 
 static int ifo_write_vgm(IFOContext *ifo)
