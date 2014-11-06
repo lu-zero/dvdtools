@@ -10,6 +10,8 @@
 #include <libavformat/avio.h>
 #include <libavformat/avformat.h>
 
+#include "common.h"
+
 #define DVD_BLOCK_LEN 2048
 
 typedef struct PutBitContext {
@@ -94,8 +96,9 @@ static inline void flush_put_bits(PutBitContext *s)
 
 static void help(char *name)
 {
-    fprintf(stderr, "%s <path> <index> <ifo>\n"
+    fprintf(stderr, "%s <path> <vobu> <index> <ifo>\n"
             "path:  Any path supported by dvdnav, device, iso or directory\n"
+            "vobu:  The path to the VOBU (must match the dvd index!)\n"
             "index: The dvd index\n"
             "ifo:   IFO file to write\n",
             name);
@@ -106,6 +109,8 @@ typedef struct IFOContext {
     AVClass *class;
     ifo_handle_t *i;
     AVIOContext *pb;
+    char *vobu_path;
+    VOBU *vobus;
 } IFOContext;
 
 IFOContext *ifo_alloc(void)
@@ -554,6 +559,18 @@ static void ifo_write_c_adt(AVIOContext *pb, int64_t offset,
     }
 }
 
+static int ifo_match_sector(int sector, VOBU *orig, VOBU *dest)
+{
+    int i;
+
+    for (i = 0; orig[i].sector >= 0; i++)
+    {
+        if (orig[i].sector == sector)
+            return dest[i].sector;
+    }
+    return -1;
+}
+
 static void ifo_write_vobu_admap(AVIOContext *pb, int64_t offset,
                                  vobu_admap_t *vobu_admap)
 {
@@ -706,21 +723,42 @@ static int ifo_write(IFOContext *ifo, int is_vgm)
 int main(int argc, char **argv)
 {
     IFOContext *ifo = NULL;
+    AVIOContext *in = NULL;
     dvd_reader_t *dvd;
-    int idx = 0;
+    int ret, idx = 0;
 
     av_register_all();
 
-    if (argc < 3)
+    if (argc < 4)
         help(argv[0]);
 
     dvd = DVDOpen(argv[1]);
 
-    idx = atoi(argv[2]);
+    ifo_open(&ifo, argv[4], AVIO_FLAG_READ_WRITE);
 
-    ifo_open(&ifo, argv[3], AVIO_FLAG_READ_WRITE);
+    ifo->vobu_path = argv[2];
+
+    idx = atoi(argv[3]);
 
     ifo->i = ifoOpen(dvd, idx);
 
-    return ifo_write(ifo, !idx);
+    ret = avio_open(&in, ifo->vobu_path, AVIO_FLAG_READ);
+    if (ret < 0) {
+        char errbuf[128];
+        av_strerror(ret, errbuf, sizeof(errbuf));
+        av_log(NULL, AV_LOG_ERROR, "Cannot open %s: %s",
+               argv[1], errbuf);
+        return 1;
+    }
+
+    if (populate_vobs(&ifo->vobus, ifo->vobu_path) < 0)
+        return -1;
+
+    ret = ifo_write(ifo, !idx);
+
+    av_free(ifo->vobus);
+
+    avio_close(in);
+
+    return ret;
 }

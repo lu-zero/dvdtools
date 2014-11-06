@@ -10,14 +10,14 @@ all: $(PROGRAMS)
 clean:
 	rm -f $(PROGRAMS) *.o
 
-dump_ifo: dump_ifo.c
+dump_ifo: dump_ifo.c common.c
 	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS)
 
 
-dump_vobu: dump_vobu.c
+dump_vobu: dump_vobu.c common.c
 	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS)
 
-rewrite_ifo: rewrite_ifo.c
+rewrite_ifo: rewrite_ifo.c common.c
 	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS)
 
 
