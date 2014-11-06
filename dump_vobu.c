@@ -213,11 +213,11 @@ int main(int argc, char *argv[])
         }
     }
 
-    vobus[i--].end = end;
+    vobus[i - 1].end = end;
 
     nb_vobus = i;
 
-    for (i = 0; i <= nb_vobus; i++) {
+    for (i = 0; i < nb_vobus; i++) {
         write_vob(vobus + i, in);
     }
 
