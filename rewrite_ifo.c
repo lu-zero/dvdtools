@@ -96,11 +96,12 @@ static inline void flush_put_bits(PutBitContext *s)
 
 static void help(char *name)
 {
-    fprintf(stderr, "%s <path> <vobu> <index> <ifo>\n"
-            "path:  Any path supported by dvdnav, device, iso or directory\n"
-            "vobu:  The path to the VOBU (must match the dvd index!)\n"
-            "index: The dvd index\n"
-            "ifo:   IFO file to write\n",
+    fprintf(stderr, "%s <path> <vobu_orig> <vobu_dest> <index> <ifo>\n"
+            "path:      Any path supported by dvdnav, device, iso or directory\n"
+            "vobu_orig: The path to the VOBU (must match the dvd index!)\n"
+            "vobu_dest: The path to the VOBU (must match the dvd index!)\n"
+            "index:     The dvd index\n"
+            "ifo:       IFO file to write\n",
             name);
     exit(0);
 }
@@ -109,8 +110,10 @@ typedef struct IFOContext {
     AVClass *class;
     ifo_handle_t *i;
     AVIOContext *pb;
-    char *vobu_path;
-    VOBU *vobus;
+    char *vobu_orig;
+    char *vobu_dest;
+    VOBU *vobus_orig;
+    VOBU *vobus_dest;
 } IFOContext;
 
 IFOContext *ifo_alloc(void)
@@ -723,42 +726,44 @@ static int ifo_write(IFOContext *ifo, int is_vgm)
 int main(int argc, char **argv)
 {
     IFOContext *ifo = NULL;
-    AVIOContext *in = NULL;
     dvd_reader_t *dvd;
     int ret, idx = 0;
+    int nb_dest, nb_orig, i;
 
     av_register_all();
 
-    if (argc < 4)
+    if (argc < 5)
         help(argv[0]);
 
     dvd = DVDOpen(argv[1]);
 
-    ifo_open(&ifo, argv[4], AVIO_FLAG_READ_WRITE);
+    ifo_open(&ifo, argv[5], AVIO_FLAG_READ_WRITE);
 
-    ifo->vobu_path = argv[2];
+    ifo->vobu_orig = argv[2];
+    ifo->vobu_dest = argv[3];
 
-    idx = atoi(argv[3]);
+    idx = atoi(argv[4]);
 
     ifo->i = ifoOpen(dvd, idx);
 
-    ret = avio_open(&in, ifo->vobu_path, AVIO_FLAG_READ);
-    if (ret < 0) {
-        char errbuf[128];
-        av_strerror(ret, errbuf, sizeof(errbuf));
-        av_log(NULL, AV_LOG_ERROR, "Cannot open %s: %s",
-               argv[1], errbuf);
-        return 1;
-    }
-
-    if (populate_vobs(&ifo->vobus, ifo->vobu_path) < 0)
+    if ((nb_orig = populate_vobs(&ifo->vobus_orig, ifo->vobu_orig)) < 0)
+        return -1;
+    if ((nb_dest = populate_vobs(&ifo->vobus_dest, ifo->vobu_dest)) < 0)
         return -1;
 
-    ret = ifo_write(ifo, !idx);
+    if (nb_orig != nb_dest) {
+        fprintf(stderr, "Number of sectors differ\n");
+        return -1;
+    }
 
-    av_free(ifo->vobus);
+    for (i = 0; i < nb_orig; i++) {
+        printf("0x%08x -> 0x%08x\n", ifo->vobus_orig[i].sector, ifo->vobus_dest[i].sector);
+    }
 
-    avio_close(in);
+//    ret = ifo_write(ifo, !idx);
+
+    av_free(ifo->vobus_orig);
+    av_free(ifo->vobus_dest);
 
     return ret;
 }
