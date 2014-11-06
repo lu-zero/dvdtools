@@ -149,7 +149,8 @@ int populate_vobs(VOBU **v, const char *filename)
     }
 
     vobus[i - 1].end = end;
-    vobus[i].sector = -1;
+    vobus[i].sector = end / 2048;
+    vobus[i + 1].sector = -1; //FIXME
 
     *v = vobus;
 
