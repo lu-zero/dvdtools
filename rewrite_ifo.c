@@ -698,8 +698,150 @@ static int ifo_write_vts(IFOContext *ifo)
     return 0;
 }
 
+static void write_playback_type(AVIOContext *pb,
+                                playback_type_t *pt)
+{
+    PutBitContext s;
+    uint8_t buf[sizeof(*pt)];
+
+    init_put_bits(&s, buf, sizeof(buf));
+    put_bits(&s, 1, pt->zero_1                   );
+    put_bits(&s, 1, pt->multi_or_random_pgc_title);
+    put_bits(&s, 1, pt->jlc_exists_in_cell_cmd   );
+    put_bits(&s, 1, pt->jlc_exists_in_prepost_cmd);
+    put_bits(&s, 1, pt->jlc_exists_in_button_cmd );
+    put_bits(&s, 1, pt->jlc_exists_in_tt_dom     );
+    put_bits(&s, 1, pt->chapter_search_or_play   );
+    put_bits(&s, 1, pt->title_or_time_play       );
+
+    flush_put_bits(&s);
+
+    avio_write(pb, buf, sizeof(buf));
+}
+
+static void write_tt_srpt(AVIOContext *pb, int64_t offset,
+                          tt_srpt_t *tt_srpt)
+{
+    int i, map_size;
+
+    map_size = (tt_srpt->last_byte + 1 - TT_SRPT_SIZE) / sizeof(title_info_t);
+
+    avio_seek(pb, offset, SEEK_SET);
+
+    avio_wb16(pb, tt_srpt->nr_of_srpts);
+    avio_wb16(pb, 0);
+    avio_wb32(pb, tt_srpt->last_byte);
+
+    for (i = 0; i < map_size; i++) {
+        write_playback_type(pb, &tt_srpt->title[i].pb_ty);
+        avio_w8(pb, tt_srpt->title[i].nr_of_angles);
+        avio_wb16(pb, tt_srpt->title[i].nr_of_ptts);
+        avio_wb16(pb, tt_srpt->title[i].parental_id);
+        avio_w8(pb, tt_srpt->title[i].title_set_nr);
+        avio_w8(pb, tt_srpt->title[i].vts_ttn);
+        avio_wb32(pb, tt_srpt->title[i].title_set_sector);
+    }
+
+}
+
 static int ifo_write_vgm(IFOContext *ifo)
 {
+    AVIOContext *pb  = ifo->pb;
+    vmgi_mat_t *vmgi = ifo->i->vmgi_mat;
+    int i;
+
+    avio_printf(pb, "%s", "DVDVIDEO-VMG");
+
+    avio_wb32(pb, vmgi->vmg_last_sector);
+
+    for (i = 0; i < 12; i++)
+        avio_w8(pb, 0);
+
+    avio_wb32(pb, vmgi->vmgi_last_sector);
+    avio_w8(pb, 0);
+
+    avio_w8(pb, vmgi->specification_version);
+    avio_wb32(pb, vmgi->vmg_category);
+    avio_wb16(pb, vmgi->vmg_nr_of_volumes);
+    avio_wb16(pb, vmgi->vmg_this_volume_nr);
+
+    avio_w8(pb, vmgi->disc_side);
+
+    for (i = 0; i < 19; i++)
+        avio_w8(pb, 0);
+
+    avio_wb16(pb, vmgi->vmg_nr_of_title_sets);
+    avio_write(pb, vmgi->provider_identifier, 32);
+
+    avio_wb64(pb, vmgi->vmg_pos_code);
+
+    for (i = 0; i < 24; i++)
+        avio_w8(pb, 0);
+
+    avio_wb32(pb, vmgi->vmgi_last_byte);
+    avio_wb32(pb, vmgi->first_play_pgc);
+
+    for (i = 0; i < 56; i++)
+        avio_w8(pb, 0);
+
+    avio_wb32(pb, vmgi->vmgm_vobs);
+    avio_wb32(pb, vmgi->tt_srpt);
+    avio_wb32(pb, vmgi->vmgm_pgci_ut);
+    avio_wb32(pb, vmgi->ptl_mait);
+    avio_wb32(pb, vmgi->vts_atrt);
+    avio_wb32(pb, vmgi->txtdt_mgi);
+    avio_wb32(pb, vmgi->vmgm_c_adt);
+    avio_wb32(pb, vmgi->vmgm_vobu_admap);
+
+    for (i = 0; i < 32; i++)
+        avio_w8(pb, 0);
+
+    write_video_attr(pb, &vmgi->vmgm_video_attr);
+    avio_w8(pb, 0);
+    avio_w8(pb, vmgi->nr_of_vmgm_audio_streams);
+
+    write_audio_attr(pb, &vmgi->vmgm_audio_attr);
+    for (i = 0; i < 7 * sizeof(audio_attr_t); i++)
+        avio_w8(pb, 0);
+
+    for (i = 0; i < 17; i++)
+        avio_w8(pb, 0);
+
+    avio_w8(pb, vmgi->nr_of_vmgm_subp_streams);
+
+    write_subp_attr(pb, &vmgi->vmgm_subp_attr);
+    for (i = 0; i < 27 * sizeof(subp_attr_t); i++)
+        avio_w8(pb, 0);
+
+
+    if (vmgi->first_play_pgc)
+        write_pgc(pb, vmgi->first_play_pgc * DVD_BLOCK_LEN,
+                  ifo->i->first_play_pgc);
+
+    write_tt_srpt(pb, vmgi->tt_srpt * DVD_BLOCK_LEN,
+                  ifo->i->tt_srpt);
+
+    ifo_write_pgci_ut(pb, vmgi->vmgm_pgci_ut * DVD_BLOCK_LEN,
+                      ifo->i->pgci_ut);
+
+    if (vmgi->ptl_mait)
+        write_ptl_mait(pb, vmgi->ptl_mait * DVD_BLOCK_LEN,
+                       ifo->i->ptl_mait);
+
+    write_vts_atrt(pb, vmgi->vts_atrt * DVD_BLOCK_LEN,
+                   ifo->i->vts_atrt);
+
+    if (vmgi->txtdt_mgi)
+        write_txtdt_mgi(pb, vmgi->txtdt_mgi * DVD_BLOCK_LEN,
+                        ifo->i->txtdt_mgi);
+
+    if (vmgi->vmgm_c_adt)
+        ifo_write_c_adt(pb, vmgi->vmgm_c_adt * DVD_BLOCK_LEN,
+                        ifo->i->menu_c_adt);
+
+    if (vmgi->vmgm_vobu_admap)
+        ifo_write_vobu_admap(pb, vmgi->vmgm_vobu_admap * DVD_BLOCK_LEN,
+                             ifo->i->menu_vobu_admap);
     return 0;
 }
 
