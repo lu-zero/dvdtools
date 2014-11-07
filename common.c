@@ -62,10 +62,10 @@ void parse_nav_pack(AVIOContext *pb, int32_t *header_state, VOBU *vobu)
     uint8_t dsi[NAV_DSI_SIZE];
 
     avio_read(pb, pci, NAV_PCI_SIZE);
-    print_pci(pci);
-    printf("state %d\n", *header_state);
+  //  print_pci(pci);
+  //  printf("state %d\n", *header_state);
     startcode = find_next_start_code(pb, &size, header_state);
-    printf("code %d\n", startcode);
+ //   printf("code %d\n", startcode);
     len = avio_rb16(pb);
     if (startcode != PRIVATE_STREAM_2 ||
         len != NAV_DSI_SIZE) {
@@ -77,7 +77,7 @@ void parse_nav_pack(AVIOContext *pb, int32_t *header_state, VOBU *vobu)
     vobu->vob_id = dsi[6 * 4] << 8 | dsi[6 * 4 + 1];
     vobu->vob_cell_id = dsi[6 * 4 + 2];
 
-    print_dsi(dsi);
+//    print_dsi(dsi);
 }
 
 int find_vobu(AVIOContext *pb, VOBU *vobus, int i)

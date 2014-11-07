@@ -932,9 +932,8 @@ static int ifo_write_vgm(IFOContext *ifo)
     for (i = 0; i < 27 * sizeof(subp_attr_t); i++)
         avio_w8(pb, 0);
 
-
     if (vmgi->first_play_pgc)
-        write_pgc(pb, vmgi->first_play_pgc * DVD_BLOCK_LEN,
+        write_pgc(pb, vmgi->first_play_pgc,
                   ifo->i->first_play_pgc);
 
     write_tt_srpt(pb, vmgi->tt_srpt * DVD_BLOCK_LEN,
@@ -961,6 +960,10 @@ static int ifo_write_vgm(IFOContext *ifo)
     if (vmgi->vmgm_vobu_admap)
         ifo_write_vobu_admap(pb, vmgi->vmgm_vobu_admap * DVD_BLOCK_LEN,
                              ifo->i->menu_vobu_admap);
+
+    avio_flush(pb);
+    avio_close(pb);
+
     return 0;
 }
 
@@ -1051,15 +1054,15 @@ int main(int argc, char **argv)
 
     ifo->i = ifoOpen(dvd, idx);
 
-    if ((nb_orig = populate_vobs(&ifo->vobus_orig, ifo->vobu_orig)) < 0)
-        return -1;
-    if ((nb_dest = populate_vobs(&ifo->vobus_dest, ifo->vobu_dest)) < 0)
-        return -1;
+//    if ((nb_orig = populate_vobs(&ifo->vobus_orig, ifo->vobu_orig)) < 0)
+//        return -1;
+//    if ((nb_dest = populate_vobs(&ifo->vobus_dest, ifo->vobu_dest)) < 0)
+//        return -1;
 
-    if (nb_orig != nb_dest) {
-        fprintf(stderr, "Number of sectors differ\n");
-        return -1;
-    }
+//    if (nb_orig != nb_dest) {
+//        fprintf(stderr, "Number of sectors differ\n");
+//        return -1;
+//    }
 /*
     for (i = 0; i < nb_orig; i++) {
         printf("0x%08x -> 0x%08x -> 0x%08x\n",
@@ -1068,7 +1071,6 @@ int main(int argc, char **argv)
                ifo_match_sector(ifo->vobus_orig[i].sector,
                                 ifo->vobus_orig, ifo->vobus_dest));
     }
-*/
     if (ifo->i->menu_c_adt)
         patch_c_adt(ifo->i->menu_c_adt, ifo->vobus_orig, ifo->vobus_dest);
     if (ifo->i->menu_vobu_admap)
@@ -1080,6 +1082,7 @@ int main(int argc, char **argv)
     if (ifo->i->vts_vobu_admap)
         patch_vobu_admap(ifo->i->vts_vobu_admap,
                          ifo->vobus_orig, ifo->vobus_dest);
+*/
 
     ret = ifo_write(ifo, !idx);
 
