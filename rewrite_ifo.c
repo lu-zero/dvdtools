@@ -756,8 +756,24 @@ static void write_pf_level(AVIOContext *pb, int64_t offset,
                            pf_level_t *pf,
                            int nr_of_vtss)
 {
+    int level, vts, map_size, i;
+    int16_t *pf_temp;
 
+    map_size = (nr_of_vtss + 1) * sizeof(pf_level_t);
 
+    pf_temp = av_malloc(map_size);
+
+    avio_seek(pb, offset, SEEK_SET);
+
+    for (level = 0; level < PTL_MAIT_NUM_LEVEL; level++) {
+        for (vts = 0; vts <= nr_of_vtss; vts++) {
+            pf_temp[(7 - level) * (nr_of_vtss + 1) + vts] = pf[vts][level];
+        }
+    }
+
+    for (i = 0; i < map_size; i++)
+        avio_wb16(pb, pf_temp[i]);
+    av_free(pf_temp);
 }
 
 static void write_ptl_mait(AVIOContext *pb, int64_t offset,
@@ -771,7 +787,7 @@ static void write_ptl_mait(AVIOContext *pb, int64_t offset,
 
     avio_wb16(pb, ptl_mait->nr_of_countries);
     avio_wb16(pb, ptl_mait->nr_of_vtss);
-    avio_wb32(pb, ptl_mait-last_byte);
+    avio_wb32(pb, ptl_mait->last_byte);
 
     for (i = 0; i < ptl_mait->nr_of_countries; i++) {
         write_ptl_mait_country(pb, ptl_mait->countries + i);
@@ -782,6 +798,69 @@ static void write_ptl_mait(AVIOContext *pb, int64_t offset,
                        ptl_mait->countries[i].pf_ptl_mai,
                        ptl_mait->nr_of_vtss);
     }
+}
+
+static void write_vts_attribute(AVIOContext *pb, int64_t offset,
+                                vts_attributes_t *vts_attributes)
+{
+    int i;
+
+    avio_seek(pb, offset, SEEK_SET);
+
+    avio_wb32(pb, vts_attributes->last_byte);
+    avio_wb32(pb, vts_attributes->vts_cat);
+    write_video_attr(pb, &vts_attributes->vtsm_vobs_attr);
+    avio_w8(pb, 0);
+    avio_w8(pb, vts_attributes->nr_of_vtsm_audio_streams);
+    write_audio_attr(pb, &vts_attributes->vtsm_audio_attr);
+    for (i = 0; i < 7 * sizeof(audio_attr_t); i++)
+        avio_w8(pb, 0);
+    for (i = 0; i < 16; i++)
+        avio_w8(pb, 0);
+    avio_w8(pb, 0);
+    avio_w8(pb, vts_attributes->nr_of_vtsm_subp_streams);
+    write_subp_attr(pb, &vts_attributes->vtsm_subp_attr);
+    for (i = 0; i < 27 * sizeof(subp_attr_t); i++)
+        avio_w8(pb, 0);
+    avio_wb16(pb, 0);
+    write_video_attr(pb, &vts_attributes->vtstt_vobs_video_attr);
+    avio_w8(pb, 0);
+    avio_w8(pb, vts_attributes->nr_of_vtstt_audio_streams);
+    for (i = 0; i < 8; i++)
+        write_audio_attr(pb, &vts_attributes->vtstt_audio_attr[i]);
+    for (i = 0; i < 16; i++)
+        avio_w8(pb, 0);
+    avio_w8(pb, 0);
+    avio_w8(pb, vts_attributes->nr_of_vtstt_subp_streams);
+    for (i = 0; i < 32; i++)
+         write_subp_attr(pb, &vts_attributes->vtstt_subp_attr[i]);
+}
+
+static void write_vts_atrt(AVIOContext *pb, int64_t offset,
+                           vts_atrt_t *vts_atrt)
+{
+    int i;
+
+    avio_seek(pb, offset, SEEK_SET);
+
+    avio_wb16(pb, vts_atrt->nr_of_vtss);
+    avio_wb16(pb, 0);
+    avio_wb32(pb, vts_atrt->last_byte);
+
+    for (i = 0; i < vts_atrt->nr_of_vtss; i++)
+        avio_wb32(pb, vts_atrt->vts_atrt_offsets[i]);
+
+    for (i = 0; i < vts_atrt->nr_of_vtss; i++)
+        write_vts_attribute(pb, offset + vts_atrt->vts_atrt_offsets[i],
+                            vts_atrt->vts + i);
+}
+
+static void write_txtdt_mgi(AVIOContext *pb, int64_t offset,
+                            txtdt_mgi_t *txtdt_mgi)
+{
+    avio_seek(pb, offset, SEEK_SET);
+
+    avio_write(pb, txtdt_mgi, sizeof(*txtdt_mgi)); //FIXME
 }
 
 static int ifo_write_vgm(IFOContext *ifo)
