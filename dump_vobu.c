@@ -14,15 +14,37 @@ static void help(char *name)
     exit(0);
 }
 
-void write_vob(VOBU *vobu, AVIOContext *in)
+
+
+AVIOContext *out = NULL;
+int vob_idn = -1;
+static int write_vob(VOBU *vobu, AVIOContext *in)
 {
-    AVIOContext *out = NULL;
     char outname[1024];
-    int ret, size;
+    int ret = 0, size;
 
-    snprintf(outname, sizeof(outname), "tmp-0x%08"PRIx32".vob", vobu->sector);
+    snprintf(outname, sizeof(outname),
+             "vob-0x%08"PRIx64"-0x%04"PRIx32"-0x%04"PRIx32".vob",
+             vobu->start,
+             vobu->dsi.dsi_gi.vobu_c_idn,
+             vobu->dsi.dsi_gi.vobu_vob_idn);
 
-    ret = avio_open(&out, outname, AVIO_FLAG_WRITE);
+    av_log(NULL, AV_LOG_WARNING, "0x%08x 0x%04x\n",
+           vobu->dsi.dsi_gi.vobu_vob_idn,
+           vobu->dsi.dsi_gi.vobu_c_idn);
+
+    if (vobu->dsi.dsi_gi.vobu_vob_idn != vob_idn) {
+        vob_idn = vobu->dsi.dsi_gi.vobu_vob_idn;
+        if (out)
+            avio_close(out);
+        ret = avio_open(&out, outname, AVIO_FLAG_WRITE);
+    }
+
+    if (ret < 0) {
+        av_log(NULL, AV_LOG_ERROR, "Cannot write %s.\n",
+               outname);
+        return ret;
+    }
 
     avio_seek(in, vobu->start, SEEK_SET);
 
@@ -41,7 +63,7 @@ void write_vob(VOBU *vobu, AVIOContext *in)
     }
 
     avio_flush(out);
-    avio_close(out);
+    return 0;
 }
 
 int main(int argc, char *argv[])
@@ -67,8 +89,13 @@ int main(int argc, char *argv[])
     nb_vobus = populate_vobs(&vobus, argv[1]);
 
     for (i = 0; i < nb_vobus; i++) {
-        write_vob(vobus + i, in);
+        ret = write_vob(vobus + i, in);
+        if (ret < 0) {
+            exit(1);
+        }
     }
+
+    avio_close(out);
 
     av_free(vobus);
 

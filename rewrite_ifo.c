@@ -779,9 +779,9 @@ static void write_pf_level(AVIOContext *pb, int64_t offset,
 static void write_ptl_mait(AVIOContext *pb, int64_t offset,
                            ptl_mait_t *ptl_mait)
 {
-    int i, map_size;
+    int i;
 
-    map_size = (ptl_mait->last_byte + 1 - PTL_MAIT_SIZE) / PTL_MAIT_COUNTRY_SIZE;
+    // map_size = (ptl_mait->last_byte + 1 - PTL_MAIT_SIZE) / PTL_MAIT_COUNTRY_SIZE;
 
     avio_seek(pb, offset, SEEK_SET);
 
@@ -860,7 +860,7 @@ static void write_txtdt_mgi(AVIOContext *pb, int64_t offset,
 {
     avio_seek(pb, offset, SEEK_SET);
 
-    avio_write(pb, txtdt_mgi, sizeof(*txtdt_mgi)); //FIXME
+    avio_write(pb, (uint8_t *)txtdt_mgi, sizeof(*txtdt_mgi)); //FIXME
 }
 
 static int ifo_write_vgm(IFOContext *ifo)
@@ -890,7 +890,7 @@ static int ifo_write_vgm(IFOContext *ifo)
         avio_w8(pb, 0);
 
     avio_wb16(pb, vmgi->vmg_nr_of_title_sets);
-    avio_write(pb, vmgi->provider_identifier, 32);
+    avio_write(pb, (uint8_t *)vmgi->provider_identifier, 32);
 
     avio_wb64(pb, vmgi->vmg_pos_code);
 
@@ -1021,7 +1021,6 @@ static void patch_c_adt(c_adt_t *c_adt, VOBU *o, VOBU *d)
 void patch_vobu_admap(vobu_admap_t *vobu_admap, VOBU *o, VOBU *d)
 {
     int i, map_size;
-    int64_t pos;
 
     map_size = (vobu_admap->last_byte + 1 - VOBU_ADMAP_SIZE) / sizeof(uint32_t);
 
@@ -1036,7 +1035,7 @@ int main(int argc, char **argv)
     IFOContext *ifo = NULL;
     dvd_reader_t *dvd;
     int ret, idx = 0;
-    int nb_dest, nb_orig, i;
+    int nb_dest, nb_orig;
 
     av_register_all();
 
@@ -1054,15 +1053,15 @@ int main(int argc, char **argv)
 
     ifo->i = ifoOpen(dvd, idx);
 
-//    if ((nb_orig = populate_vobs(&ifo->vobus_orig, ifo->vobu_orig)) < 0)
-//        return -1;
-//    if ((nb_dest = populate_vobs(&ifo->vobus_dest, ifo->vobu_dest)) < 0)
-//        return -1;
+    if ((nb_orig = populate_vobs(&ifo->vobus_orig, ifo->vobu_orig)) < 0)
+        return -1;
+    if ((nb_dest = populate_vobs(&ifo->vobus_dest, ifo->vobu_dest)) < 0)
+        return -1;
 
-//    if (nb_orig != nb_dest) {
-//        fprintf(stderr, "Number of sectors differ\n");
-//        return -1;
-//    }
+    if (nb_orig != nb_dest) {
+        fprintf(stderr, "Number of sectors differ\n");
+        return -1;
+    }
 /*
     for (i = 0; i < nb_orig; i++) {
         printf("0x%08x -> 0x%08x -> 0x%08x\n",
@@ -1071,6 +1070,7 @@ int main(int argc, char **argv)
                ifo_match_sector(ifo->vobus_orig[i].sector,
                                 ifo->vobus_orig, ifo->vobus_dest));
     }
+*/
     if (ifo->i->menu_c_adt)
         patch_c_adt(ifo->i->menu_c_adt, ifo->vobus_orig, ifo->vobus_dest);
     if (ifo->i->menu_vobu_admap)
@@ -1082,7 +1082,7 @@ int main(int argc, char **argv)
     if (ifo->i->vts_vobu_admap)
         patch_vobu_admap(ifo->i->vts_vobu_admap,
                          ifo->vobus_orig, ifo->vobus_dest);
-*/
+
 
     ret = ifo_write(ifo, !idx);
 

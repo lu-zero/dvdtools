@@ -20,11 +20,15 @@
 
 #define MAX_SYNC_SIZE 100000
 
+#include <dvdread/nav_read.h>
+
 typedef struct {
     int64_t start, end;
     int32_t sector;
     uint16_t vob_id;
     uint8_t vob_cell_id;
+    pci_t pci;
+    dsi_t dsi;
 } VOBU;
 
 void parse_nav_pack(AVIOContext *pb, int32_t *header_state, VOBU *vobu);

@@ -4,6 +4,8 @@
 #include <libavformat/avformat.h>
 #include <libavutil/intreadwrite.h>
 
+#include <dvdread/nav_print.h>
+
 #include "common.h"
 
 static int find_next_start_code(AVIOContext *pb, int *size_ptr,
@@ -33,7 +35,7 @@ found:
     *size_ptr     = n;
     return val;
 }
-
+/*
 static void print_pci(uint8_t *buf) {
     uint32_t startpts = AV_RB32(buf + 0x0d);
     uint32_t endpts   = AV_RB32(buf + 0x11);
@@ -54,7 +56,7 @@ static void print_dsi(uint8_t *buf) {
     printf("vob idn %d c_idn %d %d:%d:%d\n",
            vob_idn, vob_c_idn, hours, mins, secs);
 }
-
+*/
 void parse_nav_pack(AVIOContext *pb, int32_t *header_state, VOBU *vobu)
 {
     int size = MAX_SYNC_SIZE, startcode, len;
@@ -74,10 +76,15 @@ void parse_nav_pack(AVIOContext *pb, int32_t *header_state, VOBU *vobu)
     }
     avio_read(pb, dsi, NAV_DSI_SIZE);
 
-    vobu->vob_id = dsi[6 * 4] << 8 | dsi[6 * 4 + 1];
-    vobu->vob_cell_id = dsi[6 * 4 + 2];
+    // FIXME
+    vobu->vob_id = dsi[6 * 4 + 1] << 8 | dsi[6 * 4 + 2];
+    vobu->vob_cell_id = dsi[6 * 4 + 3];
 
-//    print_dsi(dsi);
+    navRead_PCI(&vobu->pci, pci + 1);
+    navRead_DSI(&vobu->dsi, dsi + 1);
+
+    navPrint_PCI(&vobu->pci);
+    navPrint_DSI(&vobu->dsi);
 }
 
 int find_vobu(AVIOContext *pb, VOBU *vobus, int i)
@@ -148,11 +155,17 @@ int populate_vobs(VOBU **v, const char *filename)
         }
     }
 
-    vobus[i - 1].end = end;
-    vobus[i].sector = end / 2048;
-    vobus[i + 1].sector = -1; //FIXME
-
-    *v = vobus;
+    if (i) {
+        vobus[i - 1].end = end;
+        vobus[i].sector = end / 2048;
+        if (i != 1)
+            vobus[i + 1].sector = -1; //FIXME
+        *v = vobus;
+    } else {
+        av_log(NULL, AV_LOG_ERROR, "Empty %s",
+               filename);
+        return -1;
+    }
 
     avio_close(in);
 
