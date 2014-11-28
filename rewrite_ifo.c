@@ -979,12 +979,12 @@ static int ifo_match_sector(int sector, VOBU *orig, VOBU *dest)
 {
     int i;
 
-    for (i = 0; orig[i].sector >= 0; i++)
+    for (i = 0; orig[i].start_sector >= 0; i++)
     {
-        if (orig[i].sector == sector) {
+        if (orig[i].start_sector == sector) {
             av_log(NULL, AV_LOG_FATAL|AV_LOG_C(222),
                    "Match  0x%08x\n", sector);
-            return dest[i].sector;
+            return dest[i].start_sector;
         }
     }
 
@@ -992,7 +992,18 @@ static int ifo_match_sector(int sector, VOBU *orig, VOBU *dest)
     return sector;
 }
 
-static void patch_c_adt(c_adt_t *c_adt, VOBU *o, VOBU *d)
+static VOBU *match_vobu(int vob_id, int cell_id, VOBU *vobs)
+{
+    int i;
+    for (i = 0; vobs[i].start_sector >= 0; i++) {
+        if (vobs[i].vob_id  == vob_id &&
+            vobs[i].cell_id == cell_id)
+            return vobs + i;
+    }
+    return NULL;
+}
+
+static void patch_c_adt(c_adt_t *c_adt, VOBU *d)
 {
     int i, map_size;
 
@@ -1000,6 +1011,9 @@ static void patch_c_adt(c_adt_t *c_adt, VOBU *o, VOBU *d)
 
 
     for (i = 0; i < map_size; i++) {
+        VOBU *v = match_vobu(c_adt->cell_adr_table[i].vob_id,
+                             c_adt->cell_adr_table[i].cell_id, d);
+
         av_log(NULL, AV_LOG_INFO, "vob_id %d, cell_id %d",
                c_adt->cell_adr_table[i].vob_id,
                c_adt->cell_adr_table[i].cell_id);
@@ -1008,10 +1022,8 @@ static void patch_c_adt(c_adt_t *c_adt, VOBU *o, VOBU *d)
                c_adt->cell_adr_table[i].start_sector,
                c_adt->cell_adr_table[i].last_sector);
 
-        c_adt->cell_adr_table[i].start_sector =
-            ifo_match_sector(c_adt->cell_adr_table[i].start_sector, o, d);
-        c_adt->cell_adr_table[i].last_sector =
-             ifo_match_sector(c_adt->cell_adr_table[i].last_sector + 1, o, d) - 1;
+        c_adt->cell_adr_table[i].start_sector = v->start_sector;
+        c_adt->cell_adr_table[i].last_sector  = v->end_sector;
         av_log(NULL, AV_LOG_INFO|AV_LOG_C(111), "s 0x%08x, 0x%08x\n",
                c_adt->cell_adr_table[i].start_sector,
                c_adt->cell_adr_table[i].last_sector);
@@ -1024,10 +1036,10 @@ void patch_vobu_admap(vobu_admap_t *vobu_admap, VOBU *o, VOBU *d)
 
     map_size = (vobu_admap->last_byte + 1 - VOBU_ADMAP_SIZE) / sizeof(uint32_t);
 
-
     for (i = 0; i < map_size; i++)
         vobu_admap->vobu_start_sectors[i] =
             ifo_match_sector(vobu_admap->vobu_start_sectors[i], o, d);
+
 }
 
 int main(int argc, char **argv)
@@ -1058,10 +1070,6 @@ int main(int argc, char **argv)
     if ((nb_dest = populate_vobs(&ifo->vobus_dest, ifo->vobu_dest)) < 0)
         return -1;
 
-    if (nb_orig != nb_dest) {
-        fprintf(stderr, "Number of sectors differ\n");
-        return -1;
-    }
 /*
     for (i = 0; i < nb_orig; i++) {
         printf("0x%08x -> 0x%08x -> 0x%08x\n",
@@ -1072,17 +1080,17 @@ int main(int argc, char **argv)
     }
 */
     if (ifo->i->menu_c_adt)
-        patch_c_adt(ifo->i->menu_c_adt, ifo->vobus_orig, ifo->vobus_dest);
+        patch_c_adt(ifo->i->menu_c_adt, ifo->vobus_dest);
     if (ifo->i->menu_vobu_admap)
         patch_vobu_admap(ifo->i->menu_vobu_admap,
                          ifo->vobus_orig, ifo->vobus_dest);
-
+/*
     if (ifo->i->vts_c_adt)
-        patch_c_adt(ifo->i->vts_c_adt, ifo->vobus_orig, ifo->vobus_dest);
+        patch_c_adt(ifo->i->vts_c_adt, ifo->vobus_dest);
     if (ifo->i->vts_vobu_admap)
         patch_vobu_admap(ifo->i->vts_vobu_admap,
                          ifo->vobus_orig, ifo->vobus_dest);
-
+*/
 
     ret = ifo_write(ifo, !idx);
 

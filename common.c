@@ -64,10 +64,7 @@ void parse_nav_pack(AVIOContext *pb, int32_t *header_state, VOBU *vobu)
     uint8_t dsi[NAV_DSI_SIZE];
 
     avio_read(pb, pci, NAV_PCI_SIZE);
-  //  print_pci(pci);
-  //  printf("state %d\n", *header_state);
     startcode = find_next_start_code(pb, &size, header_state);
- //   printf("code %d\n", startcode);
     len = avio_rb16(pb);
     if (startcode != PRIVATE_STREAM_2 ||
         len != NAV_DSI_SIZE) {
@@ -76,15 +73,14 @@ void parse_nav_pack(AVIOContext *pb, int32_t *header_state, VOBU *vobu)
     }
     avio_read(pb, dsi, NAV_DSI_SIZE);
 
-    // FIXME
-    vobu->vob_id = dsi[6 * 4 + 1] << 8 | dsi[6 * 4 + 2];
-    vobu->vob_cell_id = dsi[6 * 4 + 3];
 
     navRead_PCI(&vobu->pci, pci + 1);
     navRead_DSI(&vobu->dsi, dsi + 1);
 
-    navPrint_PCI(&vobu->pci);
-    navPrint_DSI(&vobu->dsi);
+//    navPrint_PCI(&vobu->pci);
+//    navPrint_DSI(&vobu->dsi);
+    vobu->vob_id  = vobu->dsi.dsi_gi.vobu_vob_idn;
+    vobu->cell_id = vobu->dsi.dsi_gi.vobu_c_idn;
 }
 
 int find_vobu(AVIOContext *pb, VOBU *vobus, int i)
@@ -107,14 +103,15 @@ redo:
         int len = avio_rb16(pb);
         if (len == NAV_PCI_SIZE) {
 
-            vobus[i].sector = (avio_tell(pb) - 44) / 2048;
-            vobus[i].start = avio_tell(pb) - 44;
+            vobus[i].start_sector = (avio_tell(pb) - 44) / 2048;
+            vobus[i].start        = avio_tell(pb) - 44;
             if (i) {
-                vobus[i - 1].end = vobus[i].start;
+                vobus[i - 1].end        = vobus[i].start;
+                vobus[i - 1].end_sector = vobus[i].start_sector;
             }
-           printf("Sector: 0x%08"PRIx32" %"PRId64"\n",
-                   vobus[i].sector, vobus[i].start);
-           parse_nav_pack(pb, &header_state, &vobus[i]);
+            printf("Sector: 0x%08"PRIx32" %"PRId64"\n",
+                   vobus[i].start_sector, vobus[i].start);
+            parse_nav_pack(pb, &header_state, &vobus[i]);
             return 0;
          } else {
             avio_skip(pb, len);
@@ -148,7 +145,7 @@ int populate_vobs(VOBU **v, const char *filename)
         return -1;
 
     while (!find_vobu(in, vobus, i)) {
-        if (++i >= size) {
+        if (++i >= size - 1) {
             size *= 2;
             if (av_reallocp_array(&vobus, size, sizeof(VOBU)) < 0)
                 return -1;
@@ -157,9 +154,9 @@ int populate_vobs(VOBU **v, const char *filename)
 
     if (i) {
         vobus[i - 1].end = end;
-        vobus[i].sector = end / 2048;
+        vobus[i].start_sector = end / 2048;
         if (i != 1)
-            vobus[i + 1].sector = -1; //FIXME
+            vobus[i + 1].start_sector = -1; //FIXME
         *v = vobus;
     } else {
         av_log(NULL, AV_LOG_ERROR, "Empty %s",

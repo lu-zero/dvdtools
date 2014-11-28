@@ -24,9 +24,9 @@
 
 typedef struct {
     int64_t start, end;
-    int32_t sector;
+    int32_t start_sector, end_sector;
     uint16_t vob_id;
-    uint8_t vob_cell_id;
+    uint8_t  cell_id;
     pci_t pci;
     dsi_t dsi;
 } VOBU;

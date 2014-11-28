@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #include <libavformat/avio.h>
 #include <libavformat/avformat.h>
@@ -8,8 +10,9 @@
 
 static void help(char *name)
 {
-    fprintf(stderr, "%s <vob>\n"
-            "vob: A VOB file.\n",
+    fprintf(stderr, "%s <vob> <outpath>\n"
+            "vob: A VOB file.\n"
+            "outpath: output path.\n",
             name);
     exit(0);
 }
@@ -18,13 +21,14 @@ static void help(char *name)
 
 AVIOContext *out = NULL;
 int vob_idn = -1;
-static int write_vob(VOBU *vobu, AVIOContext *in)
+static int write_vob(VOBU *vobu, AVIOContext *in, const char *path)
 {
     char outname[1024];
     int ret = 0, size;
 
     snprintf(outname, sizeof(outname),
-             "vob-0x%08"PRIx64"-0x%04"PRIx32"-0x%04"PRIx32".vob",
+             "%s/0x%08"PRIx64"-0x%04"PRIx32"-0x%04"PRIx32".vob",
+             path,
              vobu->start,
              vobu->dsi.dsi_gi.vobu_c_idn,
              vobu->dsi.dsi_gi.vobu_vob_idn);
@@ -73,7 +77,7 @@ int main(int argc, char *argv[])
     int ret, i = 0, nb_vobus;
     av_register_all();
 
-    if (argc < 2)
+    if (argc < 3)
         help(argv[0]);
 
     ret = avio_open(&in, argv[1], AVIO_FLAG_READ);
@@ -88,8 +92,11 @@ int main(int argc, char *argv[])
 
     nb_vobus = populate_vobs(&vobus, argv[1]);
 
+    mkdir(argv[2], 0777);
+
+
     for (i = 0; i < nb_vobus; i++) {
-        ret = write_vob(vobus + i, in);
+        ret = write_vob(vobus + i, in, argv[2]);
         if (ret < 0) {
             exit(1);
         }
