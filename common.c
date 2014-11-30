@@ -102,15 +102,12 @@ redo:
     if (startcode == PRIVATE_STREAM_2) {
         int len = avio_rb16(pb);
         if (len == NAV_PCI_SIZE) {
-
             vobus[i].start_sector = (avio_tell(pb) - 44) / 2048;
             vobus[i].start        = avio_tell(pb) - 44;
             if (i) {
                 vobus[i - 1].end        = vobus[i].start;
                 vobus[i - 1].end_sector = vobus[i].start_sector;
             }
-            printf("Sector: 0x%08"PRIx32" %"PRId64"\n",
-                   vobus[i].start_sector, vobus[i].start);
             parse_nav_pack(pb, &header_state, &vobus[i]);
             return 0;
          } else {
@@ -153,8 +150,13 @@ int populate_vobs(VOBU **v, const char *filename)
     }
 
     if (i) {
-        vobus[i - 1].end = end;
+        vobus[i - 1].end = end; //FIXME
         vobus[i].start_sector = end / 2048;
+        if (vobus[i - 1].vob_id != vobus[i].vob_id ||
+            vobus[i - 1].cell_id != vobus[i].cell_id)
+            vobus[i - 1].next = 0x3fffffff;
+        else
+            vobus[i - 1].next = vobus[i - 1].end_sector - vobus[i - 1].start_sector;
         if (i != 1)
             vobus[i + 1].start_sector = -1; //FIXME
         *v = vobus;

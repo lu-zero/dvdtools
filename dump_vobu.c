@@ -17,8 +17,6 @@ static void help(char *name)
     exit(0);
 }
 
-
-
 AVIOContext *out = NULL;
 int vob_idn = -1;
 static int write_vob(VOBU *vobu, AVIOContext *in, const char *path)

@@ -18,8 +18,19 @@ static void help(char *name)
 
 static int write_vob(VOBU *vobu)
 {
-    printf("0x%08"PRIx64"-0x%04"PRIx32"-0x%04"PRIx32"\n",
-             vobu->start,
+    int len = vobu->end_sector - 1 - vobu->start_sector;
+    printf("0x%08"PRIx32" 0x%08"PRIx32"\n"
+           "0x%08"PRIx32" 0x%08"PRIx32"\n"
+           "0x%08"PRIx32" 0x%08"PRIx32"\n"
+           "next 0x%08"PRIx32"\n"
+           " 0x%04"PRIx32" 0x%04"PRIx32"\n",
+             vobu->start_sector,
+             vobu->end_sector - 1 - vobu->start_sector,
+             vobu->dsi.dsi_gi.nv_pck_lbn,
+             vobu->dsi.dsi_gi.vobu_ea,
+             vobu->dsi.dsi_gi.nv_pck_lbn - vobu->start_sector,
+             vobu->dsi.dsi_gi.vobu_ea - len,
+             vobu->dsi.vobu_sri.next_vobu & 0x3fffffff,
              vobu->dsi.dsi_gi.vobu_c_idn,
              vobu->dsi.dsi_gi.vobu_vob_idn);
 

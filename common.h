@@ -25,6 +25,7 @@
 typedef struct {
     int64_t start, end;
     int32_t start_sector, end_sector;
+    int32_t next;
     uint16_t vob_id;
     uint8_t  cell_id;
     pci_t pci;

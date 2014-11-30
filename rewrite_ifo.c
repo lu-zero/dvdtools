@@ -1084,13 +1084,13 @@ int main(int argc, char **argv)
     if (ifo->i->menu_vobu_admap)
         patch_vobu_admap(ifo->i->menu_vobu_admap,
                          ifo->vobus_orig, ifo->vobus_dest);
-/*
+
     if (ifo->i->vts_c_adt)
         patch_c_adt(ifo->i->vts_c_adt, ifo->vobus_dest);
     if (ifo->i->vts_vobu_admap)
         patch_vobu_admap(ifo->i->vts_vobu_admap,
                          ifo->vobus_orig, ifo->vobus_dest);
-*/
+
 
     ret = ifo_write(ifo, !idx);
 
