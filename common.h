@@ -32,9 +32,15 @@ typedef struct {
     dsi_t dsi;
 } VOBU;
 
+typedef struct {
+    int cell_id;
+    int vob_id;
+    int32_t start_sector, last_sector;
+} CELL;
+
 void parse_nav_pack(AVIOContext *pb, int32_t *header_state, VOBU *vobu);
 int find_vobu(AVIOContext *pb, VOBU *vobus, int i);
 int populate_vobs(VOBU **v, const char *filename);
-
+int populate_cells(CELL **c, VOBU *vobus, int nb_vobus);
 
 #endif // COMMON_H

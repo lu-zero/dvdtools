@@ -114,6 +114,7 @@ typedef struct IFOContext {
     char *vobu_dest;
     VOBU *vobus_orig;
     VOBU *vobus_dest;
+    CELL *cells;
 } IFOContext;
 
 IFOContext *ifo_alloc(void)
@@ -505,6 +506,60 @@ static void ifo_write_pgci_ut(AVIOContext *pb, int64_t offset,
     for (i = 0; i < pgci_ut->nr_of_lus; i++)
         write_pgci_lu(pb, offset, pgci_ut->lu + i);
 }
+
+void patch_cell_playback(cell_playback_t *cell_playback, CELL *cell)
+{
+    cell_playback->first_sector = cell->start_sector;
+    cell_playback->last_sector  = cell->last_sector;
+}
+
+CELL *match_cell(CELL *cells, int nb_cells, int vob_id, int cell_id)
+{
+    int i;
+
+    for (i = 0; i < nb_cells; i++) {
+        if (cells[i].vob_id == vob_id &&
+            cells[i].cell_id == cell_id)
+            return cells + i;
+    }
+    return NULL;
+}
+
+static void patch_pgc(pgc_t *pgc, CELL *cells, int nb_cells)
+{
+    int i;
+    if (!pgc->cell_playback)
+        return;
+
+    for (i = 0; i < pgc->nr_of_cells; i++) {
+        CELL *cell = match_cell(cells, nb_cells,
+                                pgc->cell_position[i].vob_id_nr,
+                                pgc->cell_position[i].cell_nr);
+        patch_cell_playback(pgc->cell_playback + i, cell);
+    }
+}
+
+static void patch_pgcit(pgcit_t *pgcit, CELL *cells, int nb_cells)
+{
+    int i;
+
+    for (i = 0; i < pgcit->nr_of_pgci_srp; i++)
+        patch_pgc(pgcit->pgci_srp[i].pgc, cells, nb_cells);
+}
+
+static void patch_pgci_lu(pgci_lu_t *lu, CELL *cells, int nb_cells)
+{
+    patch_pgcit(lu->pgcit, cells, nb_cells);
+}
+
+static void patch_pgci_ut(pgci_ut_t *pgci_ut, CELL *cells, int nb_cells)
+{
+    int i;
+
+    for (i = 0; i < pgci_ut->nr_of_lus; i++)
+        patch_pgci_lu(pgci_ut->lu + i, cells, nb_cells);
+}
+
 
 static void write_tmap(AVIOContext *pb, int64_t offset,
                        vts_tmap_t *tmap)
@@ -1047,7 +1102,7 @@ int main(int argc, char **argv)
     IFOContext *ifo = NULL;
     dvd_reader_t *dvd;
     int ret, idx = 0;
-    int nb_dest, nb_orig;
+    int nb_dest, nb_orig, nb_cells;
 
     av_register_all();
 
@@ -1070,6 +1125,9 @@ int main(int argc, char **argv)
     if ((nb_dest = populate_vobs(&ifo->vobus_dest, ifo->vobu_dest)) < 0)
         return -1;
 
+    if ((nb_cells = populate_cells(&ifo->cells, ifo->vobus_dest, nb_dest)) < 0)
+        return -1;
+
 /*
     for (i = 0; i < nb_orig; i++) {
         printf("0x%08x -> 0x%08x -> 0x%08x\n",
@@ -1090,6 +1148,8 @@ int main(int argc, char **argv)
     if (ifo->i->vts_vobu_admap)
         patch_vobu_admap(ifo->i->vts_vobu_admap,
                          ifo->vobus_orig, ifo->vobus_dest);
+
+    patch_pgci_ut(ifo->i->pgci_ut, ifo->cells, nb_cells);
 
 
     ret = ifo_write(ifo, !idx);

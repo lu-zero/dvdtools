@@ -189,3 +189,36 @@ int populate_vobs(VOBU **v, const char *filename)
 
     return i;
 }
+
+int populate_cells(CELL **c, VOBU *vobus, int nb_vobus)
+{
+    int i, j = 0;
+    CELL *cell;
+
+    // FIXME lazy
+    cell = av_malloc(nb_vobus * sizeof(CELL));
+
+    if (!cell)
+        return AVERROR(ENOMEM);
+
+    // FIXME take care of ilvu.
+    cell[0].start_sector = 0;
+    cell[0].cell_id      = 0;
+
+    for (i = 1; i < nb_vobus; i++) {
+        if (vobus[i - 1].cell_id != vobus[i].cell_id ||
+            vobus[i - 1].vob_id != vobus[i].vob_id) {
+
+            cell[j].vob_id         = vobus[i - 1].vob_id;
+            cell[j].cell_id       = vobus[i - 1].cell_id;
+            cell[j++].last_sector = vobus[i - 1].end_sector - 1;
+            cell[j].start_sector  = vobus[i].start_sector;
+        }
+    }
+
+    cell[j].last_sector = vobus[i].end_sector;
+
+    *c = cell;
+
+    return j;
+}
