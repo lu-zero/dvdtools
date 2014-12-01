@@ -63,7 +63,12 @@ void parse_nav_pack(AVIOContext *pb, int32_t *header_state, VOBU *vobu)
     uint8_t pci[NAV_PCI_SIZE];
     uint8_t dsi[NAV_DSI_SIZE];
 
+    av_log(NULL, AV_LOG_WARNING, "PCI start %"PRId64"\n",
+           avio_tell(pb));
     avio_read(pb, pci, NAV_PCI_SIZE);
+    av_log(NULL, AV_LOG_WARNING, "PCI end %"PRId64"\n",
+           avio_tell(pb));
+
     startcode = find_next_start_code(pb, &size, header_state);
     len = avio_rb16(pb);
     if (startcode != PRIVATE_STREAM_2 ||
@@ -71,8 +76,11 @@ void parse_nav_pack(AVIOContext *pb, int32_t *header_state, VOBU *vobu)
         avio_skip(pb, len - 2);
         return;
     }
+    av_log(NULL, AV_LOG_WARNING, "DSI start %"PRId64"\n",
+           avio_tell(pb));
     avio_read(pb, dsi, NAV_DSI_SIZE);
-
+    av_log(NULL, AV_LOG_WARNING, "DSI end %"PRId64"\n",
+           avio_tell(pb));
 
     navRead_PCI(&vobu->pci, pci + 1);
     navRead_DSI(&vobu->dsi, dsi + 1);
@@ -142,6 +150,20 @@ int populate_vobs(VOBU **v, const char *filename)
         return -1;
 
     while (!find_vobu(in, vobus, i)) {
+        if (i) {
+            if (vobus[i - 1].vob_id != vobus[i].vob_id ||
+                vobus[i - 1].cell_id != vobus[i].cell_id) {
+                vobus[i - 1].next = 0x3fffffff;
+            } else {
+                vobus[i - 1].next = vobus[i - 1].end_sector -
+                                    vobus[i - 1].start_sector;
+            }
+            av_log(NULL, AV_LOG_ERROR, "%d Values %d vs %d %d vs %d - %08x\n",
+                   i - 1,
+                   vobus[i - 1].vob_id, vobus[i].vob_id,
+                   vobus[i - 1].cell_id, vobus[i].cell_id,
+                   vobus[i - 1].next);
+        }
         if (++i >= size - 1) {
             size *= 2;
             if (av_reallocp_array(&vobus, size, sizeof(VOBU)) < 0)
@@ -151,12 +173,9 @@ int populate_vobs(VOBU **v, const char *filename)
 
     if (i) {
         vobus[i - 1].end = end; //FIXME
+        vobus[i - 1].next = 0x3fffffff;
         vobus[i].start_sector = end / 2048;
-        if (vobus[i - 1].vob_id != vobus[i].vob_id ||
-            vobus[i - 1].cell_id != vobus[i].cell_id)
-            vobus[i - 1].next = 0x3fffffff;
-        else
-            vobus[i - 1].next = vobus[i - 1].end_sector - vobus[i - 1].start_sector;
+
         if (i != 1)
             vobus[i + 1].start_sector = -1; //FIXME
         *v = vobus;

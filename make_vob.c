@@ -23,7 +23,7 @@ AVIOContext *out = NULL;
 static int write_vob(VOBU *vobu, AVIOContext *in /* , int title, int *part */)
 {
     int len = vobu->end_sector - 1 - vobu->start_sector;
-    uint8_t buf[NAV_PACK_SIZE];
+    uint8_t buf[2048];
     int ret = 0, size;
     int split = 0;
     int n;
@@ -37,11 +37,13 @@ static int write_vob(VOBU *vobu, AVIOContext *in /* , int title, int *part */)
         split = 1;
     }
 */
-    printf("0x%08"PRIx32" 0x%08"PRIx32"\n"
+    printf("0x%08"PRIx32"\n"
+            "0x%08"PRIx32" 0x%08"PRIx32"\n"
            "0x%08"PRIx32" 0x%08"PRIx32"\n"
            "0x%08"PRIx32" 0x%08"PRIx32"\n"
            "next 0x%08"PRIx32"\n"
            " 0x%04"PRIx32" 0x%04"PRIx32"\n",
+             vobu->pci.pci_gi.nv_pck_lbn,
              vobu->start_sector,
              vobu->end_sector - 1 - vobu->start_sector,
              vobu->dsi.dsi_gi.nv_pck_lbn,
@@ -57,37 +59,50 @@ static int write_vob(VOBU *vobu, AVIOContext *in /* , int title, int *part */)
 
 
     // write down the NAV_PACK
-    n = avio_read(in, buf, NAV_PACK_SIZE);
+
+    n = avio_read(in, buf, sizeof(buf));
     if (n <= 0) {
         fprintf(stderr, "Can't read!\n");
         exit(1);
     }
 
     pos = avio_tell(out);
+    av_log(NULL, AV_LOG_ERROR, "Start Position %"PRId64"\n",
+           avio_tell(out));
+
     avio_write(out, buf, n);
 
     avio_seek(out, pos, SEEK_SET);
 
-    avio_seek(out, 11, SEEK_CUR);
+    avio_seek(out, 44 + 1, SEEK_CUR);
+
+    avio_wb32(out, vobu->start_sector);
+
+    avio_seek(out, pos + 1030 + 1 + 4, SEEK_SET);
 
     avio_wb32(out, vobu->start_sector);
     avio_wb32(out, len);
 
-    avio_seek(out, 80, SEEK_CUR);
+    avio_seek(out, 302, SEEK_CUR);
     avio_wb32(out, vobu->next);
 
-    avio_seek(out, pos + NAV_PACK_SIZE, SEEK_SET);
+    av_log(NULL, AV_LOG_ERROR, "Next %"PRIx32"\n",
+           vobu->next);
 
-    size = vobu->end - vobu->start - NAV_PACK_SIZE;
+    avio_seek(out, pos + sizeof(buf), SEEK_SET);
+
+    av_log(NULL, AV_LOG_ERROR, "Position %"PRId64"\n",
+           avio_tell(out));
+
+    size = vobu->end - vobu->start - sizeof(buf);
 
     while (size > 0) {
-        uint8_t buf1[2048];
-        n = avio_read(in, buf1, sizeof(buf1));
-        if (n <= 0) {
+        n = avio_read(in, buf, sizeof(buf));
+        if (n < 0) {
             fprintf(stderr, "OMGBBQ\n");
             break;
         }
-        avio_write(out, buf1, n);
+        avio_write(out, buf, n);
         size -= n;
     }
 

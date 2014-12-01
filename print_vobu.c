@@ -19,11 +19,13 @@ static void help(char *name)
 static int write_vob(VOBU *vobu)
 {
     int len = vobu->end_sector - 1 - vobu->start_sector;
-    printf("0x%08"PRIx32" 0x%08"PRIx32"\n"
+    printf("0x%08"PRIx32"\n"
+           "0x%08"PRIx32" 0x%08"PRIx32"\n"
            "0x%08"PRIx32" 0x%08"PRIx32"\n"
            "0x%08"PRIx32" 0x%08"PRIx32"\n"
            "next 0x%08"PRIx32"\n"
            " 0x%04"PRIx32" 0x%04"PRIx32"\n",
+             vobu->pci.pci_gi.nv_pck_lbn,
              vobu->start_sector,
              vobu->end_sector - 1 - vobu->start_sector,
              vobu->dsi.dsi_gi.nv_pck_lbn,
