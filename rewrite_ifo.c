@@ -517,7 +517,7 @@ CELL *match_cell(CELL *cells, int nb_cells, int vob_id, int cell_id)
 {
     int i;
 
-    for (i = 0; i < nb_cells; i++) {
+    for (i = 0; i <= nb_cells; i++) {
         if (cells[i].vob_id == vob_id &&
             cells[i].cell_id == cell_id)
             return cells + i;
@@ -1136,7 +1136,7 @@ int main(int argc, char **argv)
                ifo_match_sector(ifo->vobus_orig[i].sector,
                                 ifo->vobus_orig, ifo->vobus_dest));
     }
-*/
+
     if (ifo->i->menu_c_adt)
         patch_c_adt(ifo->i->menu_c_adt, ifo->vobus_dest);
     if (ifo->i->menu_vobu_admap)
@@ -1148,7 +1148,7 @@ int main(int argc, char **argv)
     if (ifo->i->vts_vobu_admap)
         patch_vobu_admap(ifo->i->vts_vobu_admap,
                          ifo->vobus_orig, ifo->vobus_dest);
-
+*/
     patch_pgci_ut(ifo->i->pgci_ut, ifo->cells, nb_cells);
 
 

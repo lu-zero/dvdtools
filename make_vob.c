@@ -8,9 +8,9 @@
 
 static void help(char *name)
 {
-    fprintf(stderr, "%s <vts> <outpath>\n"
+    fprintf(stderr, "%s <vts> <outvts>\n"
             "vts: collated vts file.\n"
-            "outpath: output path for the split vts files",
+            "outvts: nav patched vts file",
             name);
     exit(0);
 }
