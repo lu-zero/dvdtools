@@ -1090,6 +1090,16 @@ void patch_vobu_admap(vobu_admap_t *vobu_admap, VOBU *o, VOBU *d)
 
 }
 
+void pad_file(AVIOContext *pb)
+{
+    int i;
+    int64_t pos = avio_tell(pb);
+    int len = pos % DVD_BLOCK_LEN;
+
+    for (i = 0; i < len; i++)
+        avio_w8(pb, 0);
+}
+
 int main(int argc, char **argv)
 {
     IFOContext *ifo = NULL;
@@ -1154,8 +1164,7 @@ int main(int argc, char **argv)
 
     ret = ifo_write(ifo, !idx);
 
-    for (i = 0; i < 1024; i++)
-        avio_wb32(ifo->pb, 0);
+    pad_file(ifo->pb);
 
     avio_flush(ifo->pb);
 
