@@ -96,12 +96,13 @@ static inline void flush_put_bits(PutBitContext *s)
 
 static void help(char *name)
 {
-    fprintf(stderr, "%s <path> <vobu_orig> <vobu_dest> <index> <ifo>\n"
+    fprintf(stderr, "%s <path> <vobu_orig> <vobu_dest> <index> <ifo> <menu>\n"
             "path:      Any path supported by dvdnav, device, iso or directory\n"
             "vobu_orig: The path to the VOBU (must match the dvd index!)\n"
             "vobu_dest: The path to the VOBU (must match the dvd index!)\n"
             "index:     The dvd index\n"
-            "ifo:       IFO file to write\n",
+            "ifo:       IFO file to write\n"
+            "menu:      1 if processing a menu, 0 for title\n",
             name);
     exit(0);
 }
@@ -745,11 +746,6 @@ static int ifo_write_vts(IFOContext *ifo)
         ifo_write_vobu_admap(pb, vtsi->vts_vobu_admap * DVD_BLOCK_LEN,
                              ifo->i->vts_vobu_admap);
 
-
-    avio_flush(ifo->pb);
-
-    avio_close(ifo->pb);
-
     return 0;
 }
 
@@ -1016,9 +1012,6 @@ static int ifo_write_vgm(IFOContext *ifo)
         ifo_write_vobu_admap(pb, vmgi->vmgm_vobu_admap * DVD_BLOCK_LEN,
                              ifo->i->menu_vobu_admap);
 
-    avio_flush(pb);
-    avio_close(pb);
-
     return 0;
 }
 
@@ -1101,12 +1094,12 @@ int main(int argc, char **argv)
 {
     IFOContext *ifo = NULL;
     dvd_reader_t *dvd;
-    int ret, idx = 0;
-    int nb_dest, nb_orig, nb_cells;
+    int ret, idx = 0, i;
+    int nb_dest, nb_orig, nb_cells, menu;
 
     av_register_all();
 
-    if (argc < 5)
+    if (argc < 6)
         help(argv[0]);
 
     dvd = DVDOpen(argv[1]);
@@ -1118,10 +1111,13 @@ int main(int argc, char **argv)
 
     idx = atoi(argv[4]);
 
+    menu = atoi(argv[5]);
+
     ifo->i = ifoOpen(dvd, idx);
 
-    if ((nb_orig = populate_vobs(&ifo->vobus_orig, ifo->vobu_orig)) < 0)
-        return -1;
+
+//    if ((nb_orig = populate_vobs(&ifo->vobus_orig, ifo->vobu_orig)) < 0)
+//        return -1;
     if ((nb_dest = populate_vobs(&ifo->vobus_dest, ifo->vobu_dest)) < 0)
         return -1;
 
@@ -1149,10 +1145,21 @@ int main(int argc, char **argv)
         patch_vobu_admap(ifo->i->vts_vobu_admap,
                          ifo->vobus_orig, ifo->vobus_dest);
 */
-    patch_pgci_ut(ifo->i->pgci_ut, ifo->cells, nb_cells);
 
+
+//    if (menu)
+        patch_pgci_ut(ifo->i->pgci_ut, ifo->cells, nb_cells);
+//    else
+//        patch_pgcit(ifo->i->vts_pgcit, ifo->cells, nb_cells);
 
     ret = ifo_write(ifo, !idx);
+
+    for (i = 0; i < 1024; i++)
+        avio_wb32(ifo->pb, 0);
+
+    avio_flush(ifo->pb);
+
+    avio_close(ifo->pb);
 
     av_free(ifo->vobus_orig);
     av_free(ifo->vobus_dest);
