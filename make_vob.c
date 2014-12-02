@@ -8,9 +8,11 @@
 
 static void help(char *name)
 {
-    fprintf(stderr, "%s <vts> <outvts>\n"
+    fprintf(stderr,
+            "Repair the NAV Packet sector information\n"
+            "%s <vts> <outvts>\n"
             "vts: collated vts file.\n"
-            "outvts: nav patched vts file",
+            "outvts: outputvts file",
             name);
     exit(0);
 }
@@ -133,12 +135,7 @@ int main(int argc, char *argv[])
 
     nb_vobus = populate_vobs(&vobus, argv[1]);
 
-    char outname[1024];
-    snprintf(outname, sizeof(outname),
-             "VTS_%02i_%d.VOB",
-             1, 0);
-
-    avio_open(&out, outname, AVIO_FLAG_WRITE);
+    avio_open(&out, argv[2], AVIO_FLAG_WRITE);
 
     for (i = 0; i < nb_vobus; i++) {
         ret = write_vob(vobus + i, in);
