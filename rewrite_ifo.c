@@ -125,10 +125,13 @@ static int ifo_open(IFOContext **ifo,
     if (!ifo)
         return AVERROR(ENOMEM);
 
-    if (!idx)
-        snprintf(ifo_path, sizeof(ifo_path), "%s/VIDEO_TS/%s", path, "VIDEO_TS");
-    else
-        snprintf(ifo_path, sizeof(ifo_path), "%s/VIDEO_TS/VTS_%02d_0", path, idx);
+    if (!idx) {
+        snprintf(ifo_path, sizeof(ifo_path),
+                 "%s/VIDEO_TS/%s", path, "VIDEO_TS");
+    } else {
+        snprintf(ifo_path, sizeof(ifo_path),
+                 "%s/VIDEO_TS/VTS_%02d_0", path, idx);
+    }
 
     return avio_open(&(*ifo)->pb, ifo_path, rw);
 }
@@ -1137,7 +1140,7 @@ int fix_menu(IFOContext *ifo, const char *path, int idx)
     if (idx)
         snprintf(menu, sizeof(menu), "%s/VIDEO_TS/VTS_%02d_0.VOB", path, idx);
     else
-        snprintf(menu, sizeof(menu), "%s/VIDEO_TS.VOB", path);
+        snprintf(menu, sizeof(menu), "%s/VIDEO_TS/VIDEO_TS.VOB", path);
 
     if ((nb_vobus = populate_vobs(&vobus, menu)) < 0)
         return -1;
@@ -1173,15 +1176,16 @@ int main(int argc, char **argv)
 
     ifo->i = ifoOpen(dvd, idx);
 
-    if (!idx) {
+    if (idx) {
         ret = fix_title(ifo, dst_path, idx);
         if (ret < 0)
             return ret;
-    } else {
-        ret = fix_menu(ifo, dst_path, idx);
-        if (ret < 0)
-            return ret;
     }
+
+    ret = fix_menu(ifo, dst_path, idx);
+    if (ret < 0)
+        return ret;
+
 
 /*
     for (i = 0; i < nb_orig; i++) {
