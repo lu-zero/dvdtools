@@ -11,22 +11,25 @@ all: $(PROGRAMS)
 clean:
 	rm -f $(PROGRAMS) *.o
 
-dump_ifo: dump_ifo.c common.c
+.c.o:
+	$(CC) $(CFLAGS) -c $< -o $@
+
+dump_ifo: dump_ifo.c common.o
 	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS)
 
-make_vob: make_vob.c common.c
+make_vob: make_vob.c common.o
 	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS)
 
-print_vobu: print_vobu.c common.c
+print_vobu: print_vobu.c common.o
 	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS)
 
-dump_vobu: dump_vobu.c common.c
+dump_vobu: dump_vobu.c common.o
 	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS)
 
-print_cell: print_cell.c common.c
+print_cell: print_cell.c common.o
 	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS)
 
-rewrite_ifo: rewrite_ifo.c common.c
+rewrite_ifo: rewrite_ifo.c common.o
 	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS)
 
 
