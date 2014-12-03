@@ -96,26 +96,17 @@ static inline void flush_put_bits(PutBitContext *s)
 
 static void help(char *name)
 {
-    fprintf(stderr, "%s <path> <vobu_orig> <vobu_dest> <index> <ifo> <menu>\n"
-            "path:      Any path supported by dvdnav, device, iso or directory\n"
-            "vobu_orig: The path to the VOBU (must match the dvd index!)\n"
-            "vobu_dest: The path to the VOBU (must match the dvd index!)\n"
-            "index:     The dvd index\n"
-            "ifo:       IFO file to write\n"
-            "menu:      1 if processing a menu, 0 for title\n",
+    fprintf(stderr, "%s <src_path> <dst_path> <index>\n"
+            "src_path:  The path to a dvd-video file layout, unencrypted\n"
+            "dst_path:  The path to a dvd-video file layout, with unified VOB files.\n"
+            "index:     The index of the ifo to patch\n",
             name);
     exit(0);
 }
 
 typedef struct IFOContext {
-    AVClass *class;
     ifo_handle_t *i;
     AVIOContext *pb;
-    char *vobu_orig;
-    char *vobu_dest;
-    VOBU *vobus_orig;
-    VOBU *vobus_dest;
-    CELL *cells;
 } IFOContext;
 
 IFOContext *ifo_alloc(void)
@@ -123,11 +114,23 @@ IFOContext *ifo_alloc(void)
     return av_mallocz(sizeof(IFOContext));
 }
 
-static int ifo_open(IFOContext **ifo, const char *path, int rw)
+static int ifo_open(IFOContext **ifo,
+                    const char *path,
+                    int idx,
+                    int rw)
 {
-    *ifo = ifo_alloc();
+    char ifo_path[1224];
 
-    return avio_open(&(*ifo)->pb, path, rw);
+    *ifo = ifo_alloc();
+    if (!ifo)
+        return AVERROR(ENOMEM);
+
+    if (!idx)
+        snprintf(ifo_path, sizeof(ifo_path), "%s/VIDEO_TS/%s", path, "VIDEO_TS");
+    else
+        snprintf(ifo_path, sizeof(ifo_path), "%s/VIDEO_TS/VTS_%02d_0", path, idx);
+
+    return avio_open(&(*ifo)->pb, ifo_path, rw);
 }
 
 static void ifo_write_vts_ppt_srp(AVIOContext *pb, int offset,
@@ -1015,12 +1018,24 @@ static int ifo_write_vgm(IFOContext *ifo)
     return 0;
 }
 
-static int ifo_write(IFOContext *ifo, int is_vgm)
+static int ifo_write(IFOContext *ifo, int idx)
 {
-    if (is_vgm)
-        return ifo_write_vgm(ifo);
+    int ret, i, len;
+
+    if (idx)
+        ret = ifo_write_vts(ifo);
     else
-        return ifo_write_vts(ifo);
+        ret = ifo_write_vgm(ifo);
+
+    len = avio_tell(ifo->pb) % DVD_BLOCK_LEN;
+    for (i = 0; i < len; i++)
+        avio_w8(ifo->pb, 0);
+
+    avio_flush(ifo->pb);
+
+    avio_close(ifo->pb);
+
+    return ret;
 }
 
 static int ifo_match_sector(int sector, VOBU *orig, VOBU *dest)
@@ -1090,49 +1105,83 @@ void patch_vobu_admap(vobu_admap_t *vobu_admap, VOBU *o, VOBU *d)
 
 }
 
-void pad_file(AVIOContext *pb)
+int fix_title(IFOContext *ifo, const char* path, int idx)
 {
-    int i;
-    int64_t pos = avio_tell(pb);
-    int len = pos % DVD_BLOCK_LEN;
+    char title[1024];
+    VOBU *vobus;
+    int nb_vobus;
+    CELL *cells;
+    int nb_cells;
 
-    for (i = 0; i < len; i++)
-        avio_w8(pb, 0);
+    snprintf(title, sizeof(title), "%s/VIDEO_TS/VTS_%02d_1.VOB", path, idx);
+
+    if ((nb_vobus = populate_vobs(&vobus, title)) < 0)
+        return -1;
+
+    if ((nb_cells = populate_cells(&cells, vobus, nb_vobus)) < 0)
+        return -1;
+
+    patch_pgcit(ifo->i->vts_pgcit, cells, nb_cells);
+
+    return 0;
+}
+
+int fix_menu(IFOContext *ifo, const char *path, int idx)
+{
+    char menu[1024];
+    VOBU *vobus;
+    int nb_vobus;
+    CELL *cells;
+    int nb_cells;
+
+    if (idx)
+        snprintf(menu, sizeof(menu), "%s/VIDEO_TS/VTS_%02d_0.VOB", path, idx);
+    else
+        snprintf(menu, sizeof(menu), "%s/VIDEO_TS.VOB", path);
+
+    if ((nb_vobus = populate_vobs(&vobus, menu)) < 0)
+        return -1;
+
+    if ((nb_cells = populate_cells(&cells, vobus, nb_vobus)) < 0)
+        return -1;
+
+
+    patch_pgci_ut(ifo->i->pgci_ut, cells, nb_cells);
+
+    return 0;
 }
 
 int main(int argc, char **argv)
 {
     IFOContext *ifo = NULL;
     dvd_reader_t *dvd;
-    int ret, idx = 0, i;
-    int nb_dest, nb_orig, nb_cells, menu;
+    int ret, idx = 0;
+    const char *src_path, *dst_path;
 
     av_register_all();
 
-    if (argc < 6)
+    if (argc < 4)
         help(argv[0]);
 
-    dvd = DVDOpen(argv[1]);
+    src_path = argv[1];
+    dst_path = argv[2];
+    idx = atoi(argv[3]);
 
-    ifo_open(&ifo, argv[5], AVIO_FLAG_READ_WRITE);
+    ifo_open(&ifo, dst_path, idx, AVIO_FLAG_READ_WRITE);
 
-    ifo->vobu_orig = argv[2];
-    ifo->vobu_dest = argv[3];
-
-    idx = atoi(argv[4]);
-
-    menu = atoi(argv[5]);
+    dvd = DVDOpen(src_path);
 
     ifo->i = ifoOpen(dvd, idx);
 
-
-//    if ((nb_orig = populate_vobs(&ifo->vobus_orig, ifo->vobu_orig)) < 0)
-//        return -1;
-    if ((nb_dest = populate_vobs(&ifo->vobus_dest, ifo->vobu_dest)) < 0)
-        return -1;
-
-    if ((nb_cells = populate_cells(&ifo->cells, ifo->vobus_dest, nb_dest)) < 0)
-        return -1;
+    if (!idx) {
+        ret = fix_title(ifo, dst_path, idx);
+        if (ret < 0)
+            return ret;
+    } else {
+        ret = fix_menu(ifo, dst_path, idx);
+        if (ret < 0)
+            return ret;
+    }
 
 /*
     for (i = 0; i < nb_orig; i++) {
@@ -1156,22 +1205,5 @@ int main(int argc, char **argv)
                          ifo->vobus_orig, ifo->vobus_dest);
 */
 
-
-//    if (menu)
-        patch_pgci_ut(ifo->i->pgci_ut, ifo->cells, nb_cells);
-//    else
-//        patch_pgcit(ifo->i->vts_pgcit, ifo->cells, nb_cells);
-
-    ret = ifo_write(ifo, !idx);
-
-    pad_file(ifo->pb);
-
-    avio_flush(ifo->pb);
-
-    avio_close(ifo->pb);
-
-    av_free(ifo->vobus_orig);
-    av_free(ifo->vobus_dest);
-
-    return ret;
+    return ifo_write(ifo, idx);
 }
