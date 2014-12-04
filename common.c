@@ -63,11 +63,7 @@ void parse_nav_pack(AVIOContext *pb, int32_t *header_state, VOBU *vobu)
     uint8_t pci[NAV_PCI_SIZE];
     uint8_t dsi[NAV_DSI_SIZE];
 
-    av_log(NULL, AV_LOG_WARNING, "PCI start %"PRId64"\n",
-           avio_tell(pb));
     avio_read(pb, pci, NAV_PCI_SIZE);
-    av_log(NULL, AV_LOG_WARNING, "PCI end %"PRId64"\n",
-           avio_tell(pb));
 
     startcode = find_next_start_code(pb, &size, header_state);
     len = avio_rb16(pb);
@@ -76,11 +72,7 @@ void parse_nav_pack(AVIOContext *pb, int32_t *header_state, VOBU *vobu)
         avio_skip(pb, len - 2);
         return;
     }
-    av_log(NULL, AV_LOG_WARNING, "DSI start %"PRId64"\n",
-           avio_tell(pb));
     avio_read(pb, dsi, NAV_DSI_SIZE);
-    av_log(NULL, AV_LOG_WARNING, "DSI end %"PRId64"\n",
-           avio_tell(pb));
 
     navRead_PCI(&vobu->pci, pci + 1);
     navRead_DSI(&vobu->dsi, dsi + 1);
@@ -172,12 +164,12 @@ int populate_vobs(VOBU **v, const char *filename)
     }
 
     if (i) {
-        vobus[i - 1].end = end; //FIXME
-        vobus[i - 1].next = 0x3fffffff;
-        vobus[i].start_sector = end / 2048;
+        vobus[i - 1].end        = end;
+        vobus[i - 1].end_sector = end / 2048;
+        vobus[i - 1].next       = 0x3fffffff;
 
         if (i != 1)
-            vobus[i + 1].start_sector = -1; //FIXME
+            vobus[i].start_sector = -1; // Guard
         *v = vobus;
     } else {
         av_log(NULL, AV_LOG_ERROR, "Empty %s",
@@ -201,24 +193,16 @@ int populate_cells(CELL **c, VOBU *vobus, int nb_vobus)
     if (!cell)
         return AVERROR(ENOMEM);
 
-    // FIXME take care of ilvu.
-    cell[0].start_sector = 0;
-    cell[0].cell_id      = 0;
-
     for (i = 1; i <= nb_vobus; i++) {
         if (vobus[i - 1].cell_id != vobus[i].cell_id ||
             vobus[i - 1].vob_id != vobus[i].vob_id) {
 
-            cell[j].vob_id         = vobus[i - 1].vob_id;
+            cell[j].start_sector  = vobus[i - 1].start_sector;
+            cell[j].vob_id        = vobus[i - 1].vob_id;
             cell[j].cell_id       = vobus[i - 1].cell_id;
             cell[j++].last_sector = vobus[i - 1].end_sector - 1;
-            cell[j].start_sector  = vobus[i].start_sector;
-            cell[j].vob_id        = vobus[i].vob_id;
-            cell[j].cell_id       = vobus[i].cell_id;
         }
     }
-
-    cell[j].last_sector = vobus[i].end_sector;
 
     *c = cell;
 
