@@ -185,10 +185,11 @@ int populate_vobs(VOBU **v, const char *filename)
 int populate_cells(CELL **c, VOBU *vobus, int nb_vobus)
 {
     int i, j = 0;
+    int start_sector;
     CELL *cell;
 
     // FIXME lazy
-    cell = av_malloc(nb_vobus * sizeof(CELL));
+    cell = av_mallocz(nb_vobus * sizeof(CELL));
 
     if (!cell)
         return AVERROR(ENOMEM);
@@ -196,8 +197,9 @@ int populate_cells(CELL **c, VOBU *vobus, int nb_vobus)
     for (i = 1; i <= nb_vobus; i++) {
         if (vobus[i - 1].cell_id != vobus[i].cell_id ||
             vobus[i - 1].vob_id != vobus[i].vob_id) {
+            if (j)
+                cell[j].start_sector = cell[j - 1].last_sector + 1;
 
-            cell[j].start_sector  = vobus[i - 1].start_sector;
             cell[j].vob_id        = vobus[i - 1].vob_id;
             cell[j].cell_id       = vobus[i - 1].cell_id;
             cell[j++].last_sector = vobus[i - 1].end_sector - 1;
