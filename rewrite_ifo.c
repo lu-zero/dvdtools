@@ -1,7 +1,9 @@
 #include <stdint.h>
 #include <stdio.h>
-#include <unistd.h>
 #include <stdlib.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include <dvdread/dvd_reader.h>
 #include <dvdread/ifo_read.h>
@@ -107,7 +109,9 @@ static void help(char *name)
 typedef struct IFOContext {
     ifo_handle_t *i;
     AVIOContext *pb;
-    int vob_last_sector;
+    int menu_last_sector;
+    int title_last_sector;
+    int ifo_size;
 } IFOContext;
 
 IFOContext *ifo_alloc(void)
@@ -115,16 +119,10 @@ IFOContext *ifo_alloc(void)
     return av_mallocz(sizeof(IFOContext));
 }
 
-static int ifo_open(IFOContext **ifo,
-                    const char *path,
-                    int idx,
-                    int rw)
+static int ifo_size(const char *path, int idx)
 {
     char ifo_path[1224];
-
-    *ifo = ifo_alloc();
-    if (!ifo)
-        return AVERROR(ENOMEM);
+    struct stat st;
 
     if (!idx) {
         snprintf(ifo_path, sizeof(ifo_path),
@@ -134,7 +132,41 @@ static int ifo_open(IFOContext **ifo,
                  "%s/VIDEO_TS/VTS_%02d_0.IFO", path, idx);
     }
 
-    return avio_open(&(*ifo)->pb, ifo_path, rw);
+    stat(ifo_path, &st);
+
+    return st.st_size;
+}
+
+
+static int ifo_open_internal(AVIOContext **pb,
+                             const char *path,
+                             const char *ext,
+                             int idx,
+                             int rw)
+{
+    char ifo_path[1024];
+
+    if (!idx) {
+        snprintf(ifo_path, sizeof(ifo_path),
+                 "%s/VIDEO_TS/%s.%s", path, "VIDEO_TS", ext);
+    } else {
+        snprintf(ifo_path, sizeof(ifo_path),
+                 "%s/VIDEO_TS/VTS_%02d_0.%s", path, idx, ext);
+    }
+
+    return avio_open(pb, ifo_path, rw);
+}
+
+static int ifo_open(IFOContext **ifo,
+                    const char *path,
+                    int idx,
+                    int rw)
+{
+    *ifo = ifo_alloc();
+    if (!ifo)
+        return AVERROR(ENOMEM);
+
+    return ifo_open_internal(&(*ifo)->pb, path, "IFO", idx, rw);
 }
 
 static void ifo_write_vts_ppt_srp(AVIOContext *pb, int offset,
@@ -1028,10 +1060,9 @@ static int ifo_write(IFOContext *ifo, int idx)
     else
         ret = ifo_write_vgm(ifo);
 
-    len = avio_tell(ifo->pb) % DVD_BLOCK_LEN;
+    len = FFMAX(ifo->ifo_size - avio_tell(ifo->pb), 0);
+
     for (i = 0; i < len; i++)
-        avio_w8(ifo->pb, 0);
-    for (i = 0; i < 2048; i++)
         avio_w8(ifo->pb, 0);
 
     pos = avio_tell(ifo->pb);
@@ -1039,10 +1070,12 @@ static int ifo_write(IFOContext *ifo, int idx)
 
     ifo_last_sector = len - 1;
 
-    bup_last_sector = len * 2 + ifo->vob_last_sector;
+    bup_last_sector = len * 2 +
+                      ifo->menu_last_sector + ifo->title_last_sector + 1;
 
     av_log(NULL, AV_LOG_ERROR, "last_sector %08x ifo %08x vob_last %08x\n",
-           bup_last_sector, ifo_last_sector, ifo->vob_last_sector);
+           bup_last_sector, ifo_last_sector,
+           ifo->menu_last_sector + ifo->title_last_sector);
 
     if (ifo->i->vtsi_mat) {
         av_log(NULL, AV_LOG_WARNING, "last_sector (vts) %08x %08x\n",
@@ -1069,10 +1102,9 @@ static int ifo_write(IFOContext *ifo, int idx)
     else
         ret = ifo_write_vgm(ifo);
 
-    len = avio_tell(ifo->pb) % DVD_BLOCK_LEN;
+    len = FFMAX(ifo->ifo_size - avio_tell(ifo->pb), 0);
+
     for (i = 0; i < len; i++)
-        avio_w8(ifo->pb, 0);
-    for (i = 0; i < 2048; i++)
         avio_w8(ifo->pb, 0);
 
     avio_flush(ifo->pb);
@@ -1082,44 +1114,16 @@ static int ifo_write(IFOContext *ifo, int idx)
     return ret;
 }
 
-static int ifo_match_sector(int sector, VOBU *orig, VOBU *dest)
-{
-    int i;
-
-    for (i = 0; orig[i].start_sector >= 0; i++)
-    {
-        if (orig[i].start_sector == sector) {
-            av_log(NULL, AV_LOG_FATAL|AV_LOG_C(222),
-                   "Match  0x%08x\n", sector);
-            return dest[i].start_sector;
-        }
-    }
-
-    av_log(NULL, AV_LOG_FATAL, "No match  0x%08x\n", sector);
-    return sector;
-}
-
-static VOBU *match_vobu(int vob_id, int cell_id, VOBU *vobs)
-{
-    int i;
-    for (i = 0; vobs[i].start_sector >= 0; i++) {
-        if (vobs[i].vob_id  == vob_id &&
-            vobs[i].cell_id == cell_id)
-            return vobs + i;
-    }
-    return NULL;
-}
-
-static void patch_c_adt(c_adt_t *c_adt, VOBU *d)
+static void patch_c_adt(c_adt_t *c_adt, CELL *cells, int nb_cells)
 {
     int i, map_size;
 
     map_size = (c_adt->last_byte + 1 - C_ADT_SIZE) / sizeof(cell_adr_t);
 
-
     for (i = 0; i < map_size; i++) {
-        VOBU *v = match_vobu(c_adt->cell_adr_table[i].vob_id,
-                             c_adt->cell_adr_table[i].cell_id, d);
+        CELL *c = match_cell(cells, nb_cells,
+                             c_adt->cell_adr_table[i].vob_id,
+                             c_adt->cell_adr_table[i].cell_id);
 
         av_log(NULL, AV_LOG_INFO, "vob_id %d, cell_id %d",
                c_adt->cell_adr_table[i].vob_id,
@@ -1129,23 +1133,22 @@ static void patch_c_adt(c_adt_t *c_adt, VOBU *d)
                c_adt->cell_adr_table[i].start_sector,
                c_adt->cell_adr_table[i].last_sector);
 
-        c_adt->cell_adr_table[i].start_sector = v->start_sector;
-        c_adt->cell_adr_table[i].last_sector  = v->end_sector;
+        c_adt->cell_adr_table[i].start_sector = c->start_sector;
+        c_adt->cell_adr_table[i].last_sector  = c->last_sector;
         av_log(NULL, AV_LOG_INFO|AV_LOG_C(111), "s 0x%08x, 0x%08x\n",
                c_adt->cell_adr_table[i].start_sector,
                c_adt->cell_adr_table[i].last_sector);
     }
 }
 
-void patch_vobu_admap(vobu_admap_t *vobu_admap, VOBU *o, VOBU *d)
+void patch_vobu_admap(vobu_admap_t *vobu_admap, VOBU *vobus)
 {
     int i, map_size;
 
     map_size = (vobu_admap->last_byte + 1 - VOBU_ADMAP_SIZE) / sizeof(uint32_t);
 
     for (i = 0; i < map_size; i++)
-        vobu_admap->vobu_start_sectors[i] =
-            ifo_match_sector(vobu_admap->vobu_start_sectors[i], o, d);
+        vobu_admap->vobu_start_sectors[i] = vobus[i].start_sector;
 }
 
 int fix_title(IFOContext *ifo, const char* path, int idx)
@@ -1164,8 +1167,13 @@ int fix_title(IFOContext *ifo, const char* path, int idx)
     if ((nb_cells = populate_cells(&cells, vobus, nb_vobus)) < 0)
         return -1;
 
-//    if (ifo->i->vts_c_adt)
-//        patch_c_adt(ifo->i->vts_c_adt, vobus);
+    ifo->title_last_sector = cells[nb_cells - 1].last_sector;
+
+    if (ifo->i->vts_c_adt)
+        patch_c_adt(ifo->i->vts_c_adt, cells, nb_cells);
+
+    if (ifo->i->vts_vobu_admap)
+        patch_vobu_admap(ifo->i->vts_vobu_admap, vobus);
 
     patch_pgcit(ifo->i->vts_pgcit, cells, nb_cells);
 
@@ -1191,10 +1199,13 @@ int fix_menu(IFOContext *ifo, const char *path, int idx)
     if ((nb_cells = populate_cells(&cells, vobus, nb_vobus)) < 0)
         return -1;
 
-    ifo->vob_last_sector = cells[nb_cells - 1].last_sector;
+    ifo->menu_last_sector = cells[nb_cells - 1].last_sector;
 
-//    if (ifo->i->menu_c_adt)
-//        patch_c_adt(ifo->i->menu_c_adt, vobus);
+    if (ifo->i->menu_c_adt)
+        patch_c_adt(ifo->i->menu_c_adt, cells, nb_cells);
+
+    if (ifo->i->menu_vobu_admap)
+        patch_vobu_admap(ifo->i->menu_vobu_admap, vobus);
 
     patch_pgci_ut(ifo->i->pgci_ut, cells, nb_cells);
 
@@ -1221,6 +1232,8 @@ int main(int argc, char **argv)
 
     dvd = DVDOpen(src_path);
 
+    ifo->ifo_size = ifo_size(src_path, idx);
+
     ifo->i = ifoOpen(dvd, idx);
 
     if (idx) {
@@ -1232,24 +1245,6 @@ int main(int argc, char **argv)
     ret = fix_menu(ifo, dst_path, idx);
     if (ret < 0)
         return ret;
-
-/*
-    for (i = 0; i < nb_orig; i++) {
-        printf("0x%08x -> 0x%08x -> 0x%08x\n",
-               ifo->vobus_orig[i].sector,
-               ifo->vobus_dest[i].sector,
-               ifo_match_sector(ifo->vobus_orig[i].sector,
-                                ifo->vobus_orig, ifo->vobus_dest));
-    }
-
-    if (ifo->i->menu_vobu_admap)
-        patch_vobu_admap(ifo->i->menu_vobu_admap,
-                         ifo->vobus_orig, ifo->vobus_dest);
-
-    if (ifo->i->vts_vobu_admap)
-        patch_vobu_admap(ifo->i->vts_vobu_admap,
-                         ifo->vobus_orig, ifo->vobus_dest);
-*/
 
     return ifo_write(ifo, idx);
 }
