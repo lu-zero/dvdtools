@@ -77,8 +77,8 @@ void parse_nav_pack(AVIOContext *pb, int32_t *header_state, VOBU *vobu)
     navRead_PCI(&vobu->pci, pci + 1);
     navRead_DSI(&vobu->dsi, dsi + 1);
 
-//    navPrint_PCI(&vobu->pci);
-//    navPrint_DSI(&vobu->dsi);
+    navPrint_PCI(&vobu->pci);
+    navPrint_DSI(&vobu->dsi);
     vobu->vob_id  = vobu->dsi.dsi_gi.vobu_vob_idn;
     vobu->cell_id = vobu->dsi.dsi_gi.vobu_c_idn;
 }

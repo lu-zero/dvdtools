@@ -13,6 +13,8 @@
 #define PADDING_STREAM     0x1be
 #define PRIVATE_STREAM_2   0x1bf
 
+#define DVD_BLOCK_LEN 2048
+
 #define NAV_PCI_SIZE 980
 #define NAV_DSI_SIZE 1018
 

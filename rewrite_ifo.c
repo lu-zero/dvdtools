@@ -14,8 +14,6 @@
 
 #include "common.h"
 
-#define DVD_BLOCK_LEN 2048
-
 typedef struct PutBitContext {
     uint32_t bit_buf;
     int bit_left;

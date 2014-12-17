@@ -11,7 +11,7 @@
 static void help(char *name)
 {
     fprintf(stderr, "%s <vob> <outpath>\n"
-            "vob: A VOB file.\n"
+            "vob: A full VOB file.\n"
             "outpath: output path.\n",
             name);
     exit(0);
@@ -19,24 +19,20 @@ static void help(char *name)
 
 AVIOContext *out = NULL;
 int vob_idn = -1;
-static int write_vob(VOBU *vobu, AVIOContext *in, const char *path)
+static int write_cell(CELL *cell, AVIOContext *in, const char *path)
 {
     char outname[1024];
     int ret = 0, size;
 
     snprintf(outname, sizeof(outname),
-             "%s/0x%08"PRIx64"-0x%04"PRIx32"-0x%04"PRIx32".vob",
+             "%s/0x%08"PRIx32"-0x%04"PRIx32"-0x%04"PRIx32".vob",
              path,
-             vobu->start,
-             vobu->dsi.dsi_gi.vobu_c_idn,
-             vobu->dsi.dsi_gi.vobu_vob_idn);
+             cell->start_sector,
+             cell->cell_id,
+             cell->vob_id);
 
-    av_log(NULL, AV_LOG_WARNING, "0x%08x 0x%04x\n",
-           vobu->dsi.dsi_gi.vobu_vob_idn,
-           vobu->dsi.dsi_gi.vobu_c_idn);
-
-    if (vobu->dsi.dsi_gi.vobu_vob_idn != vob_idn) {
-        vob_idn = vobu->dsi.dsi_gi.vobu_vob_idn;
+    if (cell->vob_id != vob_idn) {
+        vob_idn = cell->vob_id;
         if (out)
             avio_close(out);
         ret = avio_open(&out, outname, AVIO_FLAG_WRITE);
@@ -48,12 +44,12 @@ static int write_vob(VOBU *vobu, AVIOContext *in, const char *path)
         return ret;
     }
 
-    avio_seek(in, vobu->start, SEEK_SET);
+    avio_seek(in, cell->start_sector * DVD_BLOCK_LEN, SEEK_SET);
 
-    size = vobu->end - vobu->start;
+    size = (1 + cell->last_sector - cell->start_sector) * DVD_BLOCK_LEN;
 
     while (size > 0) {
-        uint8_t buf[2048];
+        uint8_t buf[DVD_BLOCK_LEN];
         int n;
         n = avio_read(in, buf, sizeof(buf));
         if (n <= 0) {
@@ -72,7 +68,8 @@ int main(int argc, char *argv[])
 {
     AVIOContext *in = NULL;
     VOBU *vobus = NULL;
-    int ret, i = 0, nb_vobus;
+    CELL *cells = NULL;
+    int ret, i = 0, nb_vobus, nb_cells;
     av_register_all();
 
     if (argc < 3)
@@ -90,10 +87,13 @@ int main(int argc, char *argv[])
 
     nb_vobus = populate_vobs(&vobus, argv[1]);
 
+    nb_cells = populate_cells(&cells, vobus, nb_vobus);
+
+
     mkdir(argv[2], 0777);
 
-    for (i = 0; i < nb_vobus; i++) {
-        ret = write_vob(vobus + i, in, argv[2]);
+    for (i = 0; i < nb_cells; i++) {
+        ret = write_cell(cells + i, in, argv[2]);
         if (ret < 0) {
             exit(1);
         }
@@ -102,6 +102,7 @@ int main(int argc, char *argv[])
     avio_close(out);
 
     av_free(vobus);
+    av_free(cells);
 
     avio_close(in);
 
