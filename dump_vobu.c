@@ -18,7 +18,7 @@ static void help(char *name)
 }
 
 AVIOContext *out = NULL;
-int cell_idn = -1;
+int vob_idn = -1;
 static int write_vob(VOBU *vobu, AVIOContext *in, const char *path)
 {
     char outname[1024];
@@ -37,10 +37,10 @@ static int write_vob(VOBU *vobu, AVIOContext *in, const char *path)
            vobu->dsi.dsi_gi.vobu_vob_idn,
            vobu->dsi.dsi_gi.vobu_c_idn);
 
-    if (vobu->dsi.dsi_gi.vobu_c_idn != cell_idn) {
+    if (vobu->dsi.dsi_gi.vobu_c_idn != vob_idn) {
 //        av_log(NULL, AV_LOG_WARNING, "cell %d vs %d len %d\n",
 //               cell_idn, vobu->dsi.dsi_gi.vobu_c_idn, len);
-        cell_idn = vobu->dsi.dsi_gi.vobu_c_idn;
+        vob_idn = vobu->dsi.dsi_gi.vobu_vob_idn;
         if (out)
             avio_close(out);
         ret = avio_open(&out, outname, AVIO_FLAG_WRITE);
