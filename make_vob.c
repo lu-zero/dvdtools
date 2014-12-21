@@ -26,8 +26,7 @@ static int write_vob(VOBU *vobu, AVIOContext *in /* , int title, int *part */)
 {
     int len = vobu->end_sector - 1 - vobu->start_sector;
     uint8_t buf[2048];
-    int ret = 0, size;
-    int split = 0;
+    int size;
     int n;
     int64_t pos;
 

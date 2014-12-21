@@ -184,7 +184,6 @@ int populate_vobs(VOBU **v, const char *filename)
 int populate_cells(CELL **c, VOBU *vobus, int nb_vobus)
 {
     int i, j = 0;
-    int start_sector;
     CELL *cell;
 
     // FIXME lazy
