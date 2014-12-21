@@ -1241,8 +1241,8 @@ int main(int argc, char **argv)
     }
 
     ret = fix_menu(ifo, dst_path, idx);
-    if (ret < 0)
-        return ret;
+//    if (ret < 0)
+//        return ret;
 
     return ifo_write(ifo, idx);
 }

@@ -124,7 +124,6 @@ int main(int argc, char *argv[])
         help(argv[0]);
 
     ret = avio_open(&in, argv[1], AVIO_FLAG_READ);
-
     if (ret < 0) {
         char errbuf[128];
         av_strerror(ret, errbuf, sizeof(errbuf));

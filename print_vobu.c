@@ -4,6 +4,8 @@
 #include <libavformat/avformat.h>
 #include <libavutil/intreadwrite.h>
 
+#include <dvdread/nav_print.h>
+
 #include "common.h"
 
 static void help(char *name)
@@ -14,11 +16,24 @@ static void help(char *name)
     exit(0);
 }
 
-
-
 static int write_vob(VOBU *vobu)
 {
     int len = vobu->end_sector - 1 - vobu->start_sector;
+    if (!len) {
+        av_log(NULL, AV_LOG_INFO|AV_LOG_C(123),
+               "Empty  NAV at 0x%08"PRIx32" cell_idn %d vob_idn %d\n",
+               vobu->start_sector,
+               vobu->dsi.dsi_gi.vobu_c_idn,
+               vobu->dsi.dsi_gi.vobu_vob_idn);
+    } else {
+        av_log(NULL, AV_LOG_INFO|AV_LOG_C(111),
+               "Normal NAV at 0x%08"PRIx32" cell_idn %d vob_idn %d\n",
+               vobu->start_sector,
+               vobu->dsi.dsi_gi.vobu_c_idn,
+               vobu->dsi.dsi_gi.vobu_vob_idn);
+    }
+//    navPrint_DSI(&vobu->dsi);
+#if 0
     printf("0x%08"PRIx32"\n"
            "0x%08"PRIx32" 0x%08"PRIx32"\n"
            "0x%08"PRIx32" 0x%08"PRIx32"\n"
@@ -35,7 +50,7 @@ static int write_vob(VOBU *vobu)
              vobu->dsi.vobu_sri.next_vobu & 0x3fffffff,
              vobu->dsi.dsi_gi.vobu_c_idn,
              vobu->dsi.dsi_gi.vobu_vob_idn);
-
+#endif
     return 0;
 }
 
@@ -54,7 +69,7 @@ int main(int argc, char *argv[])
     if (ret < 0) {
         char errbuf[128];
         av_strerror(ret, errbuf, sizeof(errbuf));
-        av_log(NULL, AV_LOG_ERROR, "Cannot open %s: %s",
+        av_log(NULL, AV_LOG_ERROR, "Cannot open %s: %s\n",
                argv[1], errbuf);
         return 1;
     }
