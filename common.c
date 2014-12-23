@@ -150,7 +150,7 @@ int populate_vobs(VOBU **v, const char *filename)
                 vobus[i - 1].next = vobus[i - 1].end_sector -
                                     vobus[i - 1].start_sector;
             }
-            av_log(NULL, AV_LOG_ERROR, "%d Values %d vs %d %d vs %d\n",
+            av_log(NULL, AV_LOG_DEBUG, "%d Values %d vs %d %d vs %d\n",
                    i - 1,
                    vobus[i - 1].vob_id, vobus[i].vob_id,
                    vobus[i - 1].cell_id, vobus[i].cell_id);
@@ -195,11 +195,13 @@ int populate_cells(CELL **c, VOBU *vobus, int nb_vobus)
     for (i = 1; i <= nb_vobus; i++) {
         if (vobus[i - 1].cell_id != vobus[i].cell_id ||
             vobus[i - 1].vob_id != vobus[i].vob_id) {
-            if (j)
-                cell[j].start_sector = cell[j - 1].last_sector + 1;
+            if (j) {
+                cell[j].start_sector   = cell[j - 1].last_sector + 1;
+            }
 
             cell[j].vob_id        = vobus[i - 1].vob_id;
             cell[j].cell_id       = vobus[i - 1].cell_id;
+            cell[j].last_vobu_start_sector = vobus[i - 1].start_sector;
             cell[j++].last_sector = vobus[i - 1].end_sector - 1;
         }
     }

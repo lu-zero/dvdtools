@@ -547,8 +547,9 @@ static void ifo_write_pgci_ut(AVIOContext *pb, int64_t offset,
 
 void patch_cell_playback(cell_playback_t *cell_playback, CELL *cell)
 {
-    cell_playback->first_sector = cell->start_sector;
-    cell_playback->last_sector  = cell->last_sector;
+    cell_playback->first_sector           = cell->start_sector;
+    cell_playback->last_sector            = cell->last_sector;
+    cell_playback->last_vobu_start_sector = cell->last_vobu_start_sector;
 }
 
 CELL *match_cell(CELL *cells, int nb_cells, int vob_id, int cell_id)

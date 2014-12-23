@@ -17,11 +17,12 @@ static void help(char *name)
 static int print_cell(CELL *cell)
 {
     av_log(NULL, AV_LOG_INFO,
-           "Cell cell_id %d, vob_id %d - first %08x, last %08x\n",
+           "Cell cell_id %d, vob_id %d - first %08x, last %08x, last_vobu_start %08x\n",
            cell->cell_id,
            cell->vob_id,
            cell->start_sector,
-           cell->last_sector);
+           cell->last_sector,
+           cell->last_vobu_start_sector);
 
     return 0;
 }

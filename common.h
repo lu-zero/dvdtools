@@ -38,6 +38,7 @@ typedef struct {
     int cell_id;
     int vob_id;
     int32_t start_sector, last_sector;
+    int32_t last_vobu_start_sector; //FIXME fill this up
 } CELL;
 
 void parse_nav_pack(AVIOContext *pb, int32_t *header_state, VOBU *vobu);
