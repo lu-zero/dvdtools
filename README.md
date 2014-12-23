@@ -24,6 +24,8 @@ Print the CELL information.
 #### dump_vobu
 Split a title or a menu into its independently decodable group of vobus.
 
+#### dump_cell
+Split a title or a menu into single units, basically from NAV to NAV.
 
 ### Restructure
 
@@ -33,4 +35,8 @@ Repair the NAV sector information so it matches the current file structure.
 #### rewrite_ifo
 Repair the sector offsets to match the ones in the title and menu files.
 
+
+## Usage
+
+The tools currently let you try to fix and repair partially broken DVD, including re-encoding/concealing broken segment and make sure the damage to the menu is limited.
 

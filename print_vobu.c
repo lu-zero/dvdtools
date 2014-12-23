@@ -27,10 +27,12 @@ static int write_vob(VOBU *vobu)
                vobu->dsi.dsi_gi.vobu_vob_idn);
     } else {
         av_log(NULL, AV_LOG_INFO|AV_LOG_C(111),
-               "Normal NAV at 0x%08"PRIx32" cell_idn %d vob_idn %d\n",
+               "Normal NAV at 0x%08"PRIx32" cell_idn %d vob_idn %d "
+               "next 0x%08x\n",
                vobu->start_sector,
                vobu->dsi.dsi_gi.vobu_c_idn,
-               vobu->dsi.dsi_gi.vobu_vob_idn);
+               vobu->dsi.dsi_gi.vobu_vob_idn,
+               len + vobu->start_sector + 1);
     }
 //    navPrint_DSI(&vobu->dsi);
 #if 0

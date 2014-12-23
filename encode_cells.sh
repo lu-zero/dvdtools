@@ -1,5 +1,7 @@
 #!/bin/bash
 
+shopt -s nullglob
+
 AVCONV="/usr/src/libav/.dvdh264/avconv"
 AVCONV_ENC="-vsync passthrough -c:v libx264 -g 1 -c:a copy -c:s copy -map 0 -f dvd -y"
 
