@@ -1082,6 +1082,13 @@ static int ifo_write(IFOContext *ifo, int idx)
                ifo->i->vtsi_mat->vtsi_last_sector);
         ifo->i->vtsi_mat->vts_last_sector  = bup_last_sector;
         ifo->i->vtsi_mat->vtsi_last_sector = ifo_last_sector;
+        if (ifo->i->menu_c_adt) // FIXME doublecheck
+            ifo->i->vtsi_mat->vtsm_vobs = ifo_last_sector + 1;
+        else
+            ifo->i->vtsi_mat->vtsm_vobs = 0;
+
+        ifo->i->vtsi_mat->vtstt_vobs = ifo_last_sector + 1 +
+                                       ifo->menu_last_sector + 1;
     }
 
     if (ifo->i->vmgi_mat) {
@@ -1090,6 +1097,8 @@ static int ifo_write(IFOContext *ifo, int idx)
                ifo->i->vmgi_mat->vmgi_last_sector);
         ifo->i->vmgi_mat->vmg_last_sector  = bup_last_sector;
         ifo->i->vmgi_mat->vmgi_last_sector = ifo_last_sector;
+        ifo->i->vmgi_mat->vmgm_vobs        = ifo_last_sector + 1;
+
     }
 
     // FIXME we are writing twice, we could update just the values
