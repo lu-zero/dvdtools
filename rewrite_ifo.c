@@ -221,7 +221,7 @@ static int ifo_open(IFOContext **ifo,
     return ifo_open_internal(&(*ifo)->pb, path, "IFO", idx, rw);
 }
 
-static void ifo_write_vts_ppt_srp(AVIOContext *pb, int offset,
+static void ifo_write_vts_ptt_srp(AVIOContext *pb, int offset,
                                   vts_ptt_srpt_t *srpt)
 {
     int i, map_size;
@@ -809,7 +809,7 @@ static int ifo_write_vts(IFOContext *ifo)
         write_multichannel_ext(pb, vtsi->vts_mu_audio_attr + i);
 
     if (vtsi->vts_ptt_srpt)
-        ifo_write_vts_ppt_srp(pb, vtsi->vts_ptt_srpt * DVD_BLOCK_LEN, ifo->i->vts_ptt_srpt);
+        ifo_write_vts_ptt_srp(pb, vtsi->vts_ptt_srpt * DVD_BLOCK_LEN, ifo->i->vts_ptt_srpt);
 
     if (vtsi->vts_pgcit)
         ifo_write_pgcit(pb, vtsi->vts_pgcit * DVD_BLOCK_LEN, ifo->i->vts_pgcit);
