@@ -109,7 +109,7 @@ typedef struct IFOContext {
     AVIOContext *pb;
     int menu_last_sector;
     int title_last_sector;
-    int ifo_size;
+    int64_t ifo_size;
 } IFOContext;
 
 IFOContext *ifo_alloc(void)
@@ -117,9 +117,9 @@ IFOContext *ifo_alloc(void)
     return av_mallocz(sizeof(IFOContext));
 }
 
-static int ifo_size(const char *path, int idx)
+static int64_t ifo_size(const char *path, int idx)
 {
-    char ifo_path[1224];
+    char ifo_path[1024];
     struct stat st;
 
     if (!idx) {
@@ -135,6 +135,60 @@ static int ifo_size(const char *path, int idx)
     return st.st_size;
 }
 
+static int64_t menu_size(const char *path, int idx)
+{
+    char menu_path[1024];
+    struct stat st;
+
+    if (!idx) {
+        snprintf(menu_path, sizeof(menu_path),
+                 "%s/VIDEO_TS/%s.VOB", path, "VIDEO_TS");
+    } else {
+        snprintf(menu_path, sizeof(menu_path),
+                 "%s/VIDEO_TS/VTS_%02d_0.VOB", path, idx);
+    }
+
+    // Menu VOBs can be omitted
+    if (stat(menu_path, &st) < 0)
+        return 0;
+
+    return st.st_size;
+}
+
+static int64_t title_size(const char *path, int idx)
+{
+    char title_path[1024];
+    struct stat st;
+    if (!idx)
+        return 0;
+
+    snprintf(title_path, sizeof(title_path),
+             "%s/VIDEO_TS/VTS_%02d_1.VOB", path, idx);
+
+    stat(title_path, &st);
+
+    return st.st_size;
+}
+
+static int to_sector(int64_t size)
+{
+    return (size + DVD_BLOCK_LEN - 1) / DVD_BLOCK_LEN;
+}
+
+// ifo size is the src one by design
+static int title_set_sector(const char *src, const char *dst, int idx)
+{
+    int ifo_sector   = to_sector(ifo_size(src, idx));
+    int menu_sector  = to_sector(menu_size(dst, idx));
+    int title_sector = to_sector(title_size(dst, idx));
+
+    av_log(NULL, AV_LOG_INFO|AV_LOG_C(211),
+           "ifo 0x%08d menu 0x%08d title 0x%08d\n",
+           ifo_sector,
+           menu_sector,
+           title_sector);
+    return 2 * ifo_sector + menu_sector + title_sector;
+}
 
 static int ifo_open_internal(AVIOContext **pb,
                              const char *path,
@@ -1065,7 +1119,7 @@ static int ifo_write(IFOContext *ifo, int idx)
         avio_w8(ifo->pb, 0);
 
     pos = avio_tell(ifo->pb);
-    len = pos / 2048;
+    len = (pos + DVD_BLOCK_LEN - 1) / DVD_BLOCK_LEN;
 
     ifo_last_sector = len - 1;
 
@@ -1095,10 +1149,9 @@ static int ifo_write(IFOContext *ifo, int idx)
         av_log(NULL, AV_LOG_WARNING, "last_sector (vmg) %08x %08x\n",
                ifo->i->vmgi_mat->vmg_last_sector,
                ifo->i->vmgi_mat->vmgi_last_sector);
-        ifo->i->vmgi_mat->vmg_last_sector  = bup_last_sector;
-        ifo->i->vmgi_mat->vmgi_last_sector = ifo_last_sector;
+        ifo->i->vmgi_mat->vmg_last_sector  = bup_last_sector - 1;
+        ifo->i->vmgi_mat->vmgi_last_sector = ifo_last_sector - 1;
         ifo->i->vmgi_mat->vmgm_vobs        = ifo_last_sector + 1;
-
     }
 
     // FIXME we are writing twice, we could update just the values
@@ -1120,6 +1173,23 @@ static int ifo_write(IFOContext *ifo, int idx)
     avio_close(ifo->pb);
 
     return ret;
+}
+
+static void patch_tt_srpt(tt_srpt_t *tt_srpt,
+                          const char *src_path,
+                          const char *dst_path)
+{
+    int i, sector;
+
+    for (i = 0; i < tt_srpt->nr_of_srpts; i++) {
+        sector = title_set_sector(src_path, dst_path, i);
+        av_log(NULL, AV_LOG_INFO, "title_set_sector ");
+        av_log(NULL, AV_LOG_INFO|AV_LOG_C(121),
+               "0x%08x -> 0x%08x\n",
+               tt_srpt->title[i].title_set_sector,
+               sector);
+        tt_srpt->title[i].title_set_sector = sector;
+    }
 }
 
 static void patch_c_adt(c_adt_t *c_adt, CELL *cells, int nb_cells)
@@ -1243,6 +1313,9 @@ int main(int argc, char **argv)
     ifo->ifo_size = ifo_size(src_path, idx);
 
     ifo->i = ifoOpen(dvd, idx);
+
+    if (!idx)
+        patch_tt_srpt(ifo->i->tt_srpt, src_path, dst_path);
 
     if (idx) {
         ret = fix_title(ifo, dst_path, idx);
