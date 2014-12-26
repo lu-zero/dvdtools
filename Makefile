@@ -3,7 +3,7 @@ PKGCONF_MODULES = dvdread libavformat libavutil
 CFLAGS = -Wall -g -fsanitize=address
 CFLAGS += `$(PKGCONF) --cflags $(PKGCONF_MODULES)`
 LDFLAGS = `$(PKGCONF) --libs $(PKGCONF_MODULES)`
-PROGRAMS = dump_ifo
+PROGRAMS = dump_ifo dump_file
 PROGRAMS += dump_vobu print_vobu
 PROGRAMS += rewrite_ifo make_vob
 PROGRAMS += print_cell dump_cell
@@ -17,6 +17,9 @@ clean:
 	$(CC) $(CFLAGS) -c $< -o $@
 
 dump_ifo: dump_ifo.c common.o
+	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS)
+
+dump_file: dump_file.c
 	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS)
 
 make_vob: make_vob.c common.o
