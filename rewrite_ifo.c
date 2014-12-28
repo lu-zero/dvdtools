@@ -1150,7 +1150,7 @@ static int ifo_write(IFOContext *ifo, int idx)
                ifo->i->vmgi_mat->vmg_last_sector,
                ifo->i->vmgi_mat->vmgi_last_sector);
         ifo->i->vmgi_mat->vmg_last_sector  = bup_last_sector - 1;
-        ifo->i->vmgi_mat->vmgi_last_sector = ifo_last_sector - 1;
+        ifo->i->vmgi_mat->vmgi_last_sector = ifo_last_sector;
         ifo->i->vmgi_mat->vmgm_vobs        = ifo_last_sector + 1;
     }
 
@@ -1166,7 +1166,7 @@ static int ifo_write(IFOContext *ifo, int idx)
     len = FFMAX(ifo->ifo_size - avio_tell(ifo->pb), 0);
 
     for (i = 0; i < len; i++)
-        avio_w8(ifo->pb, 0);
+        avio_w8(ifo->pb, 0xff);
 
     avio_flush(ifo->pb);
 
