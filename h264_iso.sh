@@ -141,7 +141,7 @@ do_patch_nav(){
 do_finalize(){
     echo Finalizing...
     mkdir -p ${FN}
-    split_opts="-a 1 --numeric-suffixes=1 -b 1G --additional-suffix=.VOB"
+    split_opts="-a 1 --numeric-suffixes=1 -b 1073575936 --additional-suffix=.VOB"
     for a in ${PD}/*IFO; do
         name=$(basename ${a/.IFO/})
         cp $a ${FN}
