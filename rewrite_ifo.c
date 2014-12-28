@@ -1179,10 +1179,10 @@ static void patch_tt_srpt(tt_srpt_t *tt_srpt,
                           const char *src_path,
                           const char *dst_path)
 {
-    int i, sector;
+    int i, sector = 0;
 
     for (i = 0; i < tt_srpt->nr_of_srpts; i++) {
-        sector = title_set_sector(src_path, dst_path, i);
+        sector += title_set_sector(src_path, dst_path, i);
         av_log(NULL, AV_LOG_INFO, "title_set_sector ");
         av_log(NULL, AV_LOG_INFO|AV_LOG_C(121),
                "0x%08x -> 0x%08x\n",
