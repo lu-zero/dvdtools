@@ -1179,14 +1179,24 @@ static int ifo_write(IFOContext *ifo, int idx)
     return ret;
 }
 
-static void patch_tt_srpt(tt_srpt_t *tt_srpt,
+static void patch_tt_srpt(IFOContext *ifo,
+
                           const char *src_path,
                           const char *dst_path)
 {
-    int i, sector = 0;
+    vmgi_mat_t *vmgi_mat   = ifo->i->vmgi_mat;
+    tt_srpt_t *tt_srpt     = ifo->i->tt_srpt;
+    int i, sector          = 0;
+    int32_t *title_sectors = av_malloc(vmgi_mat->vmg_nr_of_title_sets *
+                                       sizeof(int32_t));
+
+    for (i = 0; i < vmgi_mat->vmg_nr_of_title_sets; i++) {
+        sector += title_set_sector(src_path, dst_path, i);
+        title_sectors[i] = sector;
+    }
 
     for (i = 0; i < tt_srpt->nr_of_srpts; i++) {
-        sector += title_set_sector(src_path, dst_path, i);
+        sector = title_sectors[tt_srpt->title[i].title_set_nr - 1];
         av_log(NULL, AV_LOG_INFO, "title_set_sector ");
         av_log(NULL, AV_LOG_INFO|AV_LOG_C(121),
                "0x%08x -> 0x%08x\n",
@@ -1319,7 +1329,7 @@ int main(int argc, char **argv)
     ifo->i = ifoOpen(dvd, idx);
 
     if (!idx)
-        patch_tt_srpt(ifo->i->tt_srpt, src_path, dst_path);
+        patch_tt_srpt(ifo, src_path, dst_path);
 
     if (idx) {
         ret = fix_title(ifo, dst_path, idx);
