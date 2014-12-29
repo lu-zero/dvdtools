@@ -21,6 +21,18 @@ typedef struct PutBitContext {
     int size_in_bits;
 } PutBitContext;
 
+#define avio_seek(a, b, c)                                              \
+    do {                                                                \
+        int64_t _next = b;                                              \
+        int64_t _pos  = avio_tell(a);                                   \
+        av_log(NULL, AV_LOG_INFO | AV_LOG_C(214),                       \
+               "%s %d: Seek to 0x%08" PRIx64 " from 0x%08" PRIx64 "\n", \
+               __FUNCTION__,                                            \
+               __LINE__,                                                \
+               _next, _pos);                                            \
+        avio_seek(a, b, c);                                             \
+    } while (0)
+
 static inline void init_put_bits(PutBitContext *s, uint8_t *buffer,
                                  int buffer_size)
 {
