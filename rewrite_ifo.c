@@ -576,12 +576,16 @@ static void write_multichannel_ext(AVIOContext *pb, multichannel_ext_t *ext)
 
 static void write_pgci_lu(AVIOContext *pb, int64_t offset, pgci_lu_t *lu)
 {
+    int64_t pos;
+
     avio_wb16(pb, lu->lang_code);
     avio_w8(pb, lu->lang_extension);
     avio_w8(pb, lu->exists);
     avio_wb32(pb, lu->lang_start_byte);
 
+    pos = avio_tell(pb);
     ifo_write_pgcit(pb, offset + lu->lang_start_byte, lu->pgcit);
+    avio_seek(pb, pos, SEEK_SET);
 }
 
 static void ifo_write_pgci_ut(AVIOContext *pb, int64_t offset,
