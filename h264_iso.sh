@@ -81,7 +81,7 @@ do_split(){
 
 AVCONV="avconv"
 AVCONV_ENC="-vsync passthrough "
-AVCONV_ENC+="-c:v libx264 -g 1 -preset superfast "
+AVCONV_ENC+="-c:v libx264 -preset superfast "
 AVCONV_ENC+="-c:a copy -c:s copy -map 0 -f dvd -y"
 
 do_encode(){
@@ -93,7 +93,7 @@ do_encode(){
         for b in ${a}/*_d.vob; do
             mkdir -p $dir
             name=$(basename $b)
-            ${AVCONV} -i $b ${AVCONV_ENC} ${dir}/${name} || die "Encoding"
+            ${AVCONV} -i $b ${AVCONV_ENC} ${dir}/${name} || die "Encoding $b"
         done
     done
 }
