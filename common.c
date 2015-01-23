@@ -102,13 +102,15 @@ redo:
     if (startcode == PRIVATE_STREAM_2) {
         int len = avio_rb16(pb);
         if (len == NAV_PCI_SIZE) {
+            parse_nav_pack(pb, &header_state, &vobus[i]);
+            if (!vobus[i].vob_id)
+                goto redo;
             vobus[i].start_sector = (avio_tell(pb) - 44) / 2048;
             vobus[i].start        = avio_tell(pb) - 44;
             if (i) {
                 vobus[i - 1].end        = vobus[i].start;
                 vobus[i - 1].end_sector = vobus[i].start_sector;
             }
-            parse_nav_pack(pb, &header_state, &vobus[i]);
             return 0;
          } else {
             avio_skip(pb, len);
