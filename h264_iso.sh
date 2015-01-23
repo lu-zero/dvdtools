@@ -56,7 +56,7 @@ do_unpack(){
     ## FIXME workaround
     mkdir -p ${MOUNTPOINT}
     mount ${ISOFILE} ${MOUNTPOINT}
-    cp "${MOUNTPOINT}/VIDEO_TS/*.IFO" "${ORIGIN}/VIDEO_TS"
+    cp "${MOUNTPOINT}/VIDEO_TS/"*.IFO "${ORIGIN}/VIDEO_TS"
     umount ${MOUNTPOINT}
 }
 
