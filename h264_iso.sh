@@ -31,6 +31,7 @@ fi
 ISOFILE="$1"
 DESTFILE="$2"
 WORKDIR="/mnt/work/.$(basename ${ISOFILE})"
+MOUNTPOINT="${WORKDIR}/loop"
 ORIGIN="${WORKDIR}/origin/"
 OR="${ORIGIN}/VIDEO_TS/"
 UNSPLIT="${WORKDIR}/unsplit/VIDEO_TS/"
@@ -51,6 +52,12 @@ do_unpack(){
     mkdir -p ${ORIGIN}
     iso2vob -i ${ISOFILE} -o ${ORIGIN} -x ${XML_DESC} -e || die "iso2vob"
     echo iso2vob succeeded
+
+    ## FIXME workaround
+    mkdir -p ${MOUNTPOINT}
+    mount ${ISOFILE} ${MOUNTPOINT}
+    cp "${MOUNTPOINT}/VIDEO_TS/*.IFO" "${ORIGIN}/VIDEO_TS"
+    umount ${MOUNTPOINT}
 }
 
 do_unsplit(){
@@ -116,7 +123,7 @@ do_patch_ifo(){
     echo Patching ifo files...
     mkdir -p ${OUTDIR}
 
-    rewrite_ifo ${ORIGIN} ${PATCHED} 0
+    echo rewrite_ifo ${ORIGIN} ${PATCHED}
 
     ## Patching the rest
     for a in ${OR}/*.IFO; do
