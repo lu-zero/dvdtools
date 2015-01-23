@@ -90,11 +90,12 @@ do_encode(){
 
     for a in ${SPLIT}/*; do
         dir=${ENC_SPLIT}$(basename $a)
+        mkdir -p $dir
         for b in ${a}/*_d.vob; do
-            mkdir -p $dir
             name=$(basename $b)
             ${AVCONV} -i $b ${AVCONV_ENC} ${dir}/${name} || die "Encoding $b"
         done
+        cp ${a}/*_e.vob ${dir}
     done
 }
 
@@ -122,7 +123,7 @@ do_patch_ifo(){
         ifo=$(basename $a)
         idx=$(basename $a | sed -e "s:VTS_\([[:digit:]]*\)_0.IFO:\1:")
         echo Processing $ifo
-        rewrite_ifo ${ORIGIN} ${PATCHED} ${idx}
+        rewrite_ifo ${ORIGIN} ${PATCHED} ${idx} || die $ifo failed
     done
 }
 
@@ -134,7 +135,7 @@ do_patch_nav(){
     for a in ${EU}/*.VOB; do
         name=$(basename $a)
         echo Processing $name
-        make_vob $a ${PD}/${name}
+        make_vob $a ${PD}/${name} || die $name failed
     done
 }
 
