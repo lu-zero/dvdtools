@@ -119,8 +119,6 @@ static void help(char *name)
 typedef struct IFOContext {
     ifo_handle_t *i;
     AVIOContext *pb;
-    int menu_last_sector;
-    int title_last_sector;
     int64_t ifo_size;
 } IFOContext;
 
@@ -832,8 +830,10 @@ static int ifo_write_vts(IFOContext *ifo)
 
     ifo_write_pgci_ut(pb, vtsi->vtsm_pgci_ut * DVD_BLOCK_LEN,
                       ifo->i->pgci_ut);
-    ifo_write_vts_tmapt(pb, vtsi->vts_tmapt * DVD_BLOCK_LEN,
-                        ifo->i->vts_tmapt);
+
+    if (ifo->i->vts_tmapt)
+        ifo_write_vts_tmapt(pb, vtsi->vts_tmapt * DVD_BLOCK_LEN,
+                            ifo->i->vts_tmapt);
 
     if (ifo->i->menu_c_adt)
         ifo_write_c_adt(pb, vtsi->vtsm_c_adt * DVD_BLOCK_LEN,
@@ -1118,11 +1118,15 @@ static int ifo_write_vgm(IFOContext *ifo)
     return 0;
 }
 
-static int ifo_write(IFOContext *ifo, int idx)
+static int ifo_write(IFOContext *ifo,
+                     const char *src_path,
+                     const char *dst_path,
+                     int idx)
 {
     int64_t pos;
     int ret, i, len;
     int ifo_last_sector, bup_last_sector;
+    int menu_sector, title_sector, ifo_sector;
 
     if (idx)
         ret = ifo_write_vts(ifo);
@@ -1139,26 +1143,29 @@ static int ifo_write(IFOContext *ifo, int idx)
 
     ifo_last_sector = len - 1;
 
-    bup_last_sector = len * 2 +
-                      ifo->menu_last_sector + ifo->title_last_sector + 1;
+    ifo_sector   = to_sector(ifo_size(src_path, idx));
+    menu_sector  = to_sector(menu_size(dst_path, idx));
+    title_sector = to_sector(title_size(dst_path, idx));
 
-    av_log(NULL, AV_LOG_ERROR, "last_sector %08x ifo %08x vob_last %08x\n",
-           bup_last_sector, ifo_last_sector,
-           ifo->menu_last_sector + ifo->title_last_sector);
+    av_log(NULL, AV_LOG_INFO|AV_LOG_C(111),
+           "ifo %d vs %d, menu %d title %d\n",
+           ifo_sector, ifo_last_sector,
+           menu_sector, title_sector);
+
+    bup_last_sector = title_set_sector(src_path, dst_path, idx);
 
     if (ifo->i->vtsi_mat) {
         av_log(NULL, AV_LOG_WARNING, "last_sector (vts) %08x %08x\n",
                ifo->i->vtsi_mat->vts_last_sector,
                ifo->i->vtsi_mat->vtsi_last_sector);
-        ifo->i->vtsi_mat->vts_last_sector  = bup_last_sector;
-        ifo->i->vtsi_mat->vtsi_last_sector = ifo_last_sector;
+        ifo->i->vtsi_mat->vts_last_sector  = bup_last_sector - 1;
+        ifo->i->vtsi_mat->vtsi_last_sector = ifo_sector - 1;
         if (ifo->i->menu_c_adt) // FIXME doublecheck
-            ifo->i->vtsi_mat->vtsm_vobs = ifo_last_sector + 1;
+            ifo->i->vtsi_mat->vtsm_vobs = ifo_sector - 1;
         else
             ifo->i->vtsi_mat->vtsm_vobs = 0;
 
-        ifo->i->vtsi_mat->vtstt_vobs = ifo_last_sector + 1 +
-                                       ifo->menu_last_sector + 1;
+        ifo->i->vtsi_mat->vtstt_vobs = ifo_sector + menu_sector - 1;
     }
 
     if (ifo->i->vmgi_mat) {
@@ -1166,8 +1173,8 @@ static int ifo_write(IFOContext *ifo, int idx)
                ifo->i->vmgi_mat->vmg_last_sector,
                ifo->i->vmgi_mat->vmgi_last_sector);
         ifo->i->vmgi_mat->vmg_last_sector  = bup_last_sector - 1;
-        ifo->i->vmgi_mat->vmgi_last_sector = ifo_last_sector;
-        ifo->i->vmgi_mat->vmgm_vobs        = ifo_last_sector + 1;
+        ifo->i->vmgi_mat->vmgi_last_sector = ifo_sector - 1;
+        ifo->i->vmgi_mat->vmgm_vobs        = ifo_sector;
     }
 
     // FIXME we are writing twice, we could update just the values
@@ -1209,7 +1216,8 @@ static void patch_tt_srpt(IFOContext *ifo,
 
     for (i = 0; i < tt_srpt->nr_of_srpts; i++) {
         sector = title_sectors[tt_srpt->title[i].title_set_nr - 1];
-        av_log(NULL, AV_LOG_INFO, "title_set_sector ");
+        av_log(NULL, AV_LOG_INFO, "title_set_sector %d ",
+               tt_srpt->title[i].title_set_nr - 1);
         av_log(NULL, AV_LOG_INFO|AV_LOG_C(121),
                "0x%08x -> 0x%08x\n",
                tt_srpt->title[i].title_set_sector,
@@ -1271,8 +1279,6 @@ int fix_title(IFOContext *ifo, const char* path, int idx)
     if ((nb_cells = populate_cells(&cells, vobus, nb_vobus)) < 0)
         return -1;
 
-    ifo->title_last_sector = cells[nb_cells - 1].last_sector;
-
     if (ifo->i->vts_c_adt)
         patch_c_adt(ifo->i->vts_c_adt, cells, nb_cells);
 
@@ -1302,8 +1308,6 @@ int fix_menu(IFOContext *ifo, const char *path, int idx)
 
     if ((nb_cells = populate_cells(&cells, vobus, nb_vobus)) < 0)
         return -1;
-
-    ifo->menu_last_sector = cells[nb_cells - 1].last_sector;
 
     if (ifo->i->menu_c_adt)
         patch_c_adt(ifo->i->menu_c_adt, cells, nb_cells);
@@ -1353,5 +1357,5 @@ int main(int argc, char **argv)
 //    if (ret < 0)
 //        return ret;
 
-    return ifo_write(ifo, idx);
+    return ifo_write(ifo, src_path, dst_path, idx);
 }
