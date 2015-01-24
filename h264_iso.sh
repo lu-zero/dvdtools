@@ -100,14 +100,12 @@ do_encode(){
         mkdir -p $dir
         for b in ${a}/*_d.vob; do
             name=$(basename $b)
-            ${AVCONV} -i $b ${AVCONV_ENC} ${dir}/${name} || die "Encoding $b"
+            ${AVCONV} -i $b ${AVCONV_ENC} ${dir}/${name} || die "Encoding ${AVCONV} -i $b ${AVCONV_ENC} ${dir}/${name}"
         done
         cp ${a}/*_e.vob ${dir}
     done
 }
 
-
-## FIXME take in account 0-sized nav later
 do_unify(){
     echo Building unified vob files...
     mkdir -p ${EU}
@@ -115,7 +113,11 @@ do_unify(){
     time for a in ${ENC_SPLIT}/*; do
         name=${EU}/$(basename $a).VOB
         echo "Processing $name"
-        cat ${a}/*.vob > ${name}
+        if [[ -z "$(echo ${a}/*.vob)" ]]; then
+            touch ${name}
+        else
+            cat ${a}/*.vob > ${name}
+        fi
     done
 }
 
@@ -130,7 +132,7 @@ do_patch_ifo(){
         ifo=$(basename $a)
         idx=$(basename $a | sed -e "s:VTS_\([[:digit:]]*\)_0.IFO:\1:")
         echo Processing $ifo
-        rewrite_ifo ${ORIGIN} ${PATCHED} ${idx} || die $ifo failed
+        rewrite_ifo ${ORIGIN} ${PATCHED} ${idx} || die "$ifo ${ORIGIN} ${PATCHED}"
     done
 }
 
@@ -170,13 +172,13 @@ do_make_iso(){
 }
 
 
-do_unpack
-do_unsplit
-do_split
-do_encode
-do_unify
+#do_unpack
+#do_unsplit
+#do_split
+#do_encode
+#do_unify
 do_patch_nav
-do_patch_ifo
-do_finalize
-do_make_iso
+#do_patch_ifo
+#do_finalize
+#do_make_iso
 
