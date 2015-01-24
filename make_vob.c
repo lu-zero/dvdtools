@@ -56,6 +56,8 @@ static int write_vob(VOBU *vobu, AVIOContext *in /* , int title, int *part */)
              vobu->dsi.dsi_gi.vobu_vob_idn);
 
 
+    av_log(NULL, AV_LOG_ERROR, "IN Start Position %"PRId64"\n",
+           vobu->start);
     avio_seek(in, vobu->start, SEEK_SET);
 
 
