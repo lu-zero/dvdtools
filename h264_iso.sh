@@ -172,13 +172,13 @@ do_make_iso(){
 }
 
 
-#do_unpack
-#do_unsplit
-#do_split
-#do_encode
-#do_unify
+do_unpack
+do_unsplit
+do_split
+do_encode
+do_unify
 do_patch_nav
-#do_patch_ifo
-#do_finalize
-#do_make_iso
+do_patch_ifo
+do_finalize
+do_make_iso
 
