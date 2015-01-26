@@ -1161,7 +1161,7 @@ static int ifo_write(IFOContext *ifo,
         ifo->i->vtsi_mat->vts_last_sector  = bup_last_sector - 1;
         ifo->i->vtsi_mat->vtsi_last_sector = ifo_sector - 1;
         if (ifo->i->menu_c_adt) // FIXME doublecheck
-            ifo->i->vtsi_mat->vtsm_vobs = ifo_sector - 1;
+            ifo->i->vtsi_mat->vtsm_vobs = ifo_sector;
         else
             ifo->i->vtsi_mat->vtsm_vobs = 0;
 
