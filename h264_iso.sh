@@ -31,6 +31,7 @@ fi
 ISOFILE="$1"
 DESTFILE="$2"
 WORKDIR="/mnt/work/.$(basename ${ISOFILE})"
+DVDCSS_CACHE="${WORKDIR}/dvdccs-cache"
 MOUNTPOINT="${WORKDIR}/loop"
 ORIGIN="${WORKDIR}/origin/"
 OR="${ORIGIN}/VIDEO_TS/"
@@ -49,6 +50,7 @@ echo "Work directory ${WORKDIR}"
 
 do_unpack(){
     echo Unpacking the iso...
+    export DVDCSS_CACHE="${DVDCSS_CACHE}"
     mkdir -p ${ORIGIN}
     iso2vob -i ${ISOFILE} -o ${ORIGIN} -x ${XML_DESC} -e || die "iso2vob"
     echo iso2vob succeeded
