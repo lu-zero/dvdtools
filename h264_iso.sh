@@ -89,7 +89,7 @@ do_split(){
 }
 
 AVCONV="avconv"
-AVCONV_ENC="-vsync passthrough "
+AVCONV_ENC="-v warning -vsync passthrough "
 AVCONV_ENC+="-c:v libx264 -preset superfast "
 AVCONV_ENC+="-c:a copy -c:s copy -map 0 -f dvd -y"
 
