@@ -1165,7 +1165,7 @@ static int ifo_write(IFOContext *ifo,
         else
             ifo->i->vtsi_mat->vtsm_vobs = 0;
 
-        ifo->i->vtsi_mat->vtstt_vobs = ifo_sector + menu_sector - 1;
+        ifo->i->vtsi_mat->vtstt_vobs = ifo_sector + menu_sector;
     }
 
     if (ifo->i->vmgi_mat) {
