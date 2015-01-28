@@ -629,6 +629,12 @@ CELL *match_cell(CELL *cells, int nb_cells, int vob_id, int cell_id)
             cells[i].cell_id == cell_id)
             return cells + i;
     }
+
+    av_log(NULL, AV_LOG_ERROR, "Cannot find cell %d-%d\n",
+           vob_id, cell_id);
+
+    exit(1);
+
     return NULL;
 }
 
@@ -1232,6 +1238,8 @@ static void patch_c_adt(c_adt_t *c_adt, CELL *cells, int nb_cells)
 
     map_size = (c_adt->last_byte + 1 - C_ADT_SIZE) / sizeof(cell_adr_t);
 
+
+
     for (i = 0; i < map_size; i++) {
         CELL *c = match_cell(cells, nb_cells,
                              c_adt->cell_adr_table[i].vob_id,
@@ -1253,11 +1261,18 @@ static void patch_c_adt(c_adt_t *c_adt, CELL *cells, int nb_cells)
     }
 }
 
-void patch_vobu_admap(vobu_admap_t *vobu_admap, VOBU *vobus)
+void patch_vobu_admap(vobu_admap_t *vobu_admap, VOBU *vobus, int nb_vobus)
 {
     int i, map_size;
 
     map_size = (vobu_admap->last_byte + 1 - VOBU_ADMAP_SIZE) / sizeof(uint32_t);
+
+    if (map_size > nb_vobus) {
+        av_log(NULL, AV_LOG_ERROR,
+               "The number of vobus %d is less than %d cannot patch admap,\n",
+               nb_vobus, map_size);
+        exit(1);
+    }
 
     for (i = 0; i < map_size; i++)
         vobu_admap->vobu_start_sectors[i] = vobus[i].start_sector;
@@ -1283,7 +1298,7 @@ int fix_title(IFOContext *ifo, const char* path, int idx)
         patch_c_adt(ifo->i->vts_c_adt, cells, nb_cells);
 
     if (ifo->i->vts_vobu_admap)
-        patch_vobu_admap(ifo->i->vts_vobu_admap, vobus);
+        patch_vobu_admap(ifo->i->vts_vobu_admap, vobus, nb_vobus);
 
     patch_pgcit(ifo->i->vts_pgcit, cells, nb_cells);
 
@@ -1313,7 +1328,7 @@ int fix_menu(IFOContext *ifo, const char *path, int idx)
         patch_c_adt(ifo->i->menu_c_adt, cells, nb_cells);
 
     if (ifo->i->menu_vobu_admap)
-        patch_vobu_admap(ifo->i->menu_vobu_admap, vobus);
+        patch_vobu_admap(ifo->i->menu_vobu_admap, vobus, nb_vobus);
 
     patch_pgci_ut(ifo->i->pgci_ut, cells, nb_cells);
 
