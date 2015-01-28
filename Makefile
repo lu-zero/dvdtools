@@ -7,6 +7,7 @@ PROGRAMS = dump_ifo dump_file
 PROGRAMS += dump_vobu print_vobu
 PROGRAMS += rewrite_ifo make_vob
 PROGRAMS += print_cell dump_cell
+PROGRAMS += print_startcodes
 
 all: $(PROGRAMS)
 
@@ -38,6 +39,9 @@ dump_cell: dump_cell.c common.o
 	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS)
 
 rewrite_ifo: rewrite_ifo.c common.o
+	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS)
+
+print_startcodes: print_startcodes.c common.o
 	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS)
 
 

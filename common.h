@@ -46,4 +46,6 @@ int find_vobu(AVIOContext *pb, VOBU *vobus, int i);
 int populate_vobs(VOBU **v, const char *filename);
 int populate_cells(CELL **c, VOBU *vobus, int nb_vobus);
 
+int find_next_start_code(AVIOContext *pb, int *size_ptr,
+                         int32_t *header_state);
 #endif // COMMON_H

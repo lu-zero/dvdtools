@@ -8,8 +8,8 @@
 
 #include "common.h"
 
-static int find_next_start_code(AVIOContext *pb, int *size_ptr,
-                                int32_t *header_state)
+int find_next_start_code(AVIOContext *pb, int *size_ptr,
+                         int32_t *header_state)
 {
     unsigned int state, v;
     int val, n;
