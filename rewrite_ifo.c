@@ -1267,7 +1267,7 @@ void patch_vobu_admap(vobu_admap_t *vobu_admap, VOBU *vobus, int nb_vobus)
 
     map_size = (vobu_admap->last_byte + 1 - VOBU_ADMAP_SIZE) / sizeof(uint32_t);
 
-    if (map_size > nb_vobus) {
+    if (map_size > nb_vobus + 1) {
         av_log(NULL, AV_LOG_ERROR,
                "The number of vobus %d is less than %d cannot patch admap,\n",
                nb_vobus, map_size);
