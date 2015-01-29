@@ -69,7 +69,6 @@ void parse_nav_pack(AVIOContext *pb, int32_t *header_state, VOBU *vobu)
     len = avio_rb16(pb);
     if (startcode != PRIVATE_STREAM_2 ||
         len != NAV_DSI_SIZE) {
-        avio_skip(pb, len - 2);
         return;
     }
     avio_read(pb, dsi, NAV_DSI_SIZE);
@@ -114,7 +113,6 @@ redo:
             }
             return 0;
          } else {
-            avio_skip(pb, len);
             goto redo;
         }
     } else {

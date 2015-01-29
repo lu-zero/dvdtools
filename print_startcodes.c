@@ -25,42 +25,52 @@ static int print_startcodes(AVIOContext *avio)
     if (startcode < 0)
         return AVERROR_EOF;
 
+    fprintf(stderr, "Startcode : 0x%08x pos : 0x%08"PRId64" ",
+            startcode, avio_tell(avio));
+
     switch (startcode) {
     case PACK_START_CODE:
         av_log(NULL, AV_LOG_INFO|AV_LOG_C(112),
-               "PACK\t");
+               "PACK\n");
     break;
     case SYSTEM_HEADER_START_CODE:
         av_log(NULL, AV_LOG_INFO|AV_LOG_C(132),
-               "SYSTEM\t");
+               "SYSTEM\n");
     break;
     case SEQUENCE_END_CODE:
         av_log(NULL, AV_LOG_INFO|AV_LOG_C(142),
-               "END\t");
+               "END\n");
     break;
     case PACKET_START_CODE_PREFIX:
         av_log(NULL, AV_LOG_INFO|AV_LOG_C(152),
-               "PREFIX\t");
+               "PREFIX\n");
     break;
     case ISO_11172_END_CODE:
         av_log(NULL, AV_LOG_INFO|AV_LOG_C(121),
-               "END2\t");
+               "END2\n");
     break;
     case PRIVATE_STREAM_1:
         av_log(NULL, AV_LOG_INFO|AV_LOG_C(124),
-               "AUDIO\t");
+               "AUDIO\n");
     break;
-    case PRIVATE_STREAM_2:
+    case PRIVATE_STREAM_2: {
+        int len = avio_rb16(avio);
+        VOBU vobu = { 0 };
+
+        if (len == NAV_PCI_SIZE) {
+            parse_nav_pack(avio, &header_state, &vobu);
+
+        }
+
         av_log(NULL, AV_LOG_INFO|AV_LOG_C(211),
-               "NAV\t");
+               "NAV %d, vob_id %d cell_id %d\n",
+               len, vobu.vob_id, vobu.cell_id);
+    }
     break;
     default:
         av_log(NULL, AV_LOG_INFO|AV_LOG_C(222),
-               "UNK\t");
+               "UNK\n");
     }
-
-    fprintf(stderr, "Startcode : 0x%08x pos : 0x%08"PRId64"\n",
-            startcode, avio_tell(avio));
 
     return avio->eof_reached;
 }

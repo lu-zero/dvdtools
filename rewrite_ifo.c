@@ -624,7 +624,7 @@ CELL *match_cell(CELL *cells, int nb_cells, int vob_id, int cell_id)
 {
     int i;
 
-    for (i = 0; i <= nb_cells; i++) {
+    for (i = 0; i < nb_cells; i++) {
         if (cells[i].vob_id == vob_id &&
             cells[i].cell_id == cell_id)
             return cells + i;
