@@ -921,7 +921,7 @@ static void write_pf_level(AVIOContext *pb, int64_t offset,
 
     map_size = (nr_of_vtss + 1) * sizeof(pf_level_t);
 
-    pf_temp = av_malloc(map_size);
+    pf_temp = av_malloc(map_size * sizeof(int16_t));
 
     avio_seek(pb, offset, SEEK_SET);
 
