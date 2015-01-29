@@ -12,7 +12,7 @@ usage(){
     echo "Convert the iso to h264"
 }
 
-if [[ "$#" -ne 2 ]]; then
+if [[ "$#" -lt 2 ]]; then
     usage
     exit 1
 fi
@@ -27,6 +27,7 @@ if [[ ! -f "$1" ]]; then
     exit 1
 fi
 
+wipe="$3"
 
 ISOFILE="$1"
 DESTFILE="$2"
@@ -47,6 +48,10 @@ OUTDIR="${WORKDIR}/out"
 FN="${OUTDIR}/VIDEO_TS/"
 
 echo "Work directory ${WORKDIR}"
+
+if [[ "$wipe" = "wipe" ]]; then
+    rm -fR ${WORKDIR}
+fi
 
 do_unpack(){
     echo Unpacking the iso...
@@ -200,3 +205,6 @@ do_patch_ifo
 do_finalize
 do_make_iso
 
+if [[ "$wipe" = "wipe" ]]; then
+    rm -Rf ${WORKDIR}
+fi
