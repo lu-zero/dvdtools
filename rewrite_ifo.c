@@ -1271,7 +1271,9 @@ void patch_vobu_admap(vobu_admap_t *vobu_admap, VOBU *vobus, int nb_vobus)
         av_log(NULL, AV_LOG_ERROR,
                "The number of vobus %d is less than %d cannot patch admap,\n",
                nb_vobus, map_size);
-        exit(1);
+//        exit(1); XXX HACK!
+        map_size = nb_vobus + 1;
+        vobu_admap->last_byte = VOBU_ADMAP_SIZE - 1 + map_size;
     }
 
     for (i = 0; i < map_size; i++)
