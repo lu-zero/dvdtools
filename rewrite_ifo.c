@@ -185,10 +185,9 @@ static int to_sector(int64_t size)
     return (size + DVD_BLOCK_LEN - 1) / DVD_BLOCK_LEN;
 }
 
-// ifo size is the src one by design
-static int title_set_sector(const char *src, const char *dst, int idx)
+static int title_set_sector(const char *dst, int idx)
 {
-    int ifo_sector   = to_sector(ifo_size(src, idx));
+    int ifo_sector   = to_sector(ifo_size(dst, idx));
     int menu_sector  = to_sector(menu_size(dst, idx));
     int title_sector = to_sector(title_size(dst, idx));
 
@@ -1124,41 +1123,22 @@ static int ifo_write_vgm(IFOContext *ifo)
     return 0;
 }
 
-static int ifo_write(IFOContext *ifo,
-                     const char *src_path,
-                     const char *dst_path,
-                     int idx)
+static void update_values(IFOContext *ifo,
+                          const char *dst_path,
+                          int idx)
 {
-    int64_t pos;
-    int ret, i, len;
-    int ifo_last_sector, bup_last_sector;
+    int bup_last_sector;
     int menu_sector, title_sector, ifo_sector;
 
-    if (idx)
-        ret = ifo_write_vts(ifo);
-    else
-        ret = ifo_write_vgm(ifo);
-
-    len = FFMAX(ifo->ifo_size - avio_tell(ifo->pb), 0);
-
-    for (i = 0; i < len; i++)
-        avio_w8(ifo->pb, 0);
-
-    pos = avio_tell(ifo->pb);
-    len = (pos + DVD_BLOCK_LEN - 1) / DVD_BLOCK_LEN;
-
-    ifo_last_sector = len - 1;
-
-    ifo_sector   = to_sector(ifo_size(src_path, idx));
+    ifo_sector   = to_sector(ifo_size(dst_path, idx));
     menu_sector  = to_sector(menu_size(dst_path, idx));
     title_sector = to_sector(title_size(dst_path, idx));
 
     av_log(NULL, AV_LOG_INFO|AV_LOG_C(111),
-           "ifo %d vs %d, menu %d title %d\n",
-           ifo_sector, ifo_last_sector,
-           menu_sector, title_sector);
+           "ifo %d, menu %d title %d\n",
+           ifo_sector, menu_sector, title_sector);
 
-    bup_last_sector = title_set_sector(src_path, dst_path, idx);
+    bup_last_sector = title_set_sector(dst_path, idx);
 
     if (ifo->i->vtsi_mat) {
         av_log(NULL, AV_LOG_WARNING, "last_sector (vts) %08x %08x\n",
@@ -1182,20 +1162,21 @@ static int ifo_write(IFOContext *ifo,
         ifo->i->vmgi_mat->vmgi_last_sector = ifo_sector - 1;
         ifo->i->vmgi_mat->vmgm_vobs        = ifo_sector;
     }
+}
 
-    // FIXME we are writing twice, we could update just the values
-    // now that we know them.
-    avio_seek(ifo->pb, 0, SEEK_SET);
+static int ifo_write(IFOContext *ifo, int idx)
+{
+    int ret, i, len;
 
     if (idx)
         ret = ifo_write_vts(ifo);
     else
         ret = ifo_write_vgm(ifo);
 
-    len = FFMAX(ifo->ifo_size - avio_tell(ifo->pb), 0);
+    len = to_sector(avio_tell(ifo->pb)) * DVD_BLOCK_LEN - avio_tell(ifo->pb);
 
     for (i = 0; i < len; i++)
-        avio_w8(ifo->pb, 0xff);
+        avio_w8(ifo->pb, 0);
 
     avio_flush(ifo->pb);
 
@@ -1205,8 +1186,6 @@ static int ifo_write(IFOContext *ifo,
 }
 
 static void patch_tt_srpt(IFOContext *ifo,
-
-                          const char *src_path,
                           const char *dst_path)
 {
     vmgi_mat_t *vmgi_mat   = ifo->i->vmgi_mat;
@@ -1216,7 +1195,7 @@ static void patch_tt_srpt(IFOContext *ifo,
                                        sizeof(int32_t));
 
     for (i = 0; i < vmgi_mat->vmg_nr_of_title_sets; i++) {
-        sector += title_set_sector(src_path, dst_path, i);
+        sector += title_set_sector(dst_path, i);
         title_sectors[i] = sector;
     }
 
@@ -1267,17 +1246,32 @@ void patch_vobu_admap(vobu_admap_t *vobu_admap, VOBU *vobus, int nb_vobus)
 
     map_size = (vobu_admap->last_byte + 1 - VOBU_ADMAP_SIZE) / sizeof(uint32_t);
 
-    if (map_size > nb_vobus + 1) {
+    if (map_size != nb_vobus) {
+        uint32_t *p = realloc(vobu_admap->vobu_start_sectors,
+                              sizeof(uint32_t) * (nb_vobus + 1));
+        if (!p) {
+            av_log(NULL, AV_LOG_ERROR, "Not enough memory\n");
+            exit(1);
+        }
         av_log(NULL, AV_LOG_ERROR,
-               "The number of vobus %d is less than %d cannot patch admap,\n",
+               "The number of vobus %d  and map_size %d mismatch\n",
                nb_vobus, map_size);
-//        exit(1); XXX HACK!
-        map_size = nb_vobus + 1;
-        vobu_admap->last_byte = VOBU_ADMAP_SIZE - 1 + map_size;
+        map_size = nb_vobus;
+        vobu_admap->last_byte = VOBU_ADMAP_SIZE - 1 + map_size * sizeof(uint32_t);
+        vobu_admap->vobu_start_sectors = p;
     }
 
-    for (i = 0; i < map_size; i++)
+    for (i = 0; i < map_size; i++) {
+        av_log(NULL, AV_LOG_INFO, "admap ");
+        av_log(NULL, AV_LOG_INFO|AV_LOG_C(111),
+               "%08x",
+               vobu_admap->vobu_start_sectors[i]);
+        av_log(NULL, AV_LOG_INFO, " -> ");
+        av_log(NULL, AV_LOG_INFO|AV_LOG_C(111),
+               "%08x\n", vobus[i].start_sector);
+
         vobu_admap->vobu_start_sectors[i] = vobus[i].start_sector;
+    }
 }
 
 int fix_title(IFOContext *ifo, const char* path, int idx)
@@ -1361,18 +1355,26 @@ int main(int argc, char **argv)
 
     ifo->i = ifoOpen(dvd, idx);
 
-    if (!idx)
-        patch_tt_srpt(ifo, src_path, dst_path);
-
     if (idx) {
         ret = fix_title(ifo, dst_path, idx);
         if (ret < 0)
             return ret;
     }
 
-    ret = fix_menu(ifo, dst_path, idx);
-//    if (ret < 0)
-//        return ret;
+    // menu files can be missing
+    fix_menu(ifo, dst_path, idx);
 
-    return ifo_write(ifo, src_path, dst_path, idx);
+    ret = ifo_write(ifo, idx);
+    if (ret < 0)
+        return ret;
+
+    // now we know for sure how big the ifo is.
+    if (!idx)
+        patch_tt_srpt(ifo, dst_path);
+
+    update_values(ifo, dst_path, idx);
+
+    ret = ifo_open_internal(&ifo->pb, dst_path, "IFO", idx, AVIO_FLAG_READ_WRITE);
+
+    return ifo_write(ifo, idx);
 }
