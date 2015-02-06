@@ -149,7 +149,8 @@ do_patch_nav(){
     for a in ${EU}/*.VOB; do
         name=$(basename $a)
         echo Processing $name
-        make_vob $a ${PD}/${name} || die $name failed
+        make_vob $a ${PD}/${name}.t || die $name failed
+        make_vob ${PD}/${name}.t ${PD}/${name} || die $name failed
     done
 
     echo Copying the menus
