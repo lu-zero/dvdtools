@@ -38,7 +38,8 @@ static int write_vob(VOBU *vobu, AVIOContext *in /* , int title, int *part */)
         split = 1;
     }
 */
-    printf("0x%08"PRIx32"\n"
+
+    av_log(NULL, AV_LOG_DEBUG, "0x%08"PRIx32"\n"
             "0x%08"PRIx32" 0x%08"PRIx32"\n"
            "0x%08"PRIx32" 0x%08"PRIx32"\n"
            "0x%08"PRIx32" 0x%08"PRIx32"\n"
@@ -56,7 +57,7 @@ static int write_vob(VOBU *vobu, AVIOContext *in /* , int title, int *part */)
              vobu->dsi.dsi_gi.vobu_vob_idn);
 
 
-    av_log(NULL, AV_LOG_ERROR, "IN Start Position %"PRId64"\n",
+    av_log(NULL, AV_LOG_VERBOSE, "IN Start Position %"PRId64"\n",
            vobu->start);
     avio_seek(in, vobu->start, SEEK_SET);
 
@@ -70,7 +71,7 @@ static int write_vob(VOBU *vobu, AVIOContext *in /* , int title, int *part */)
     }
 
     pos = avio_tell(out);
-    av_log(NULL, AV_LOG_ERROR, "Start Position %"PRId64"\n",
+    av_log(NULL, AV_LOG_VERBOSE, "Start Position %"PRId64"\n",
            avio_tell(out));
 
     avio_write(out, buf, n);
@@ -89,12 +90,12 @@ static int write_vob(VOBU *vobu, AVIOContext *in /* , int title, int *part */)
     avio_seek(out, 302, SEEK_CUR);
     avio_wb32(out, vobu->next);
 
-    av_log(NULL, AV_LOG_ERROR, "Next %"PRIx32"\n",
+    av_log(NULL, AV_LOG_VERBOSE, "Next %"PRIx32"\n",
            vobu->next);
 
     avio_seek(out, pos + sizeof(buf), SEEK_SET);
 
-    av_log(NULL, AV_LOG_ERROR, "Position %"PRId64"\n",
+    av_log(NULL, AV_LOG_VERBOSE, "Position %"PRId64"\n",
            avio_tell(out));
 
     size = vobu->end - vobu->start - sizeof(buf);

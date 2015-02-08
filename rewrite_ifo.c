@@ -25,7 +25,7 @@ typedef struct PutBitContext {
     do {                                                                \
         int64_t _next = b;                                              \
         int64_t _pos  = avio_tell(a);                                   \
-        av_log(NULL, AV_LOG_INFO | AV_LOG_C(214),                       \
+        av_log(NULL, AV_LOG_DEBUG | AV_LOG_C(214),                       \
                "%s %d: Seek to 0x%08" PRIx64 " from 0x%08" PRIx64 "\n", \
                __FUNCTION__,                                            \
                __LINE__,                                                \
@@ -191,7 +191,7 @@ static int title_set_sector(const char *dst, int idx)
     int menu_sector  = to_sector(menu_size(dst, idx));
     int title_sector = to_sector(title_size(dst, idx));
 
-    av_log(NULL, AV_LOG_INFO|AV_LOG_C(211),
+    av_log(NULL, AV_LOG_DEBUG|AV_LOG_C(211),
            "ifo 0x%08d menu 0x%08d title 0x%08d\n",
            ifo_sector,
            menu_sector,
@@ -1141,7 +1141,7 @@ static void update_values(IFOContext *ifo,
     bup_last_sector = title_set_sector(dst_path, idx);
 
     if (ifo->i->vtsi_mat) {
-        av_log(NULL, AV_LOG_WARNING, "last_sector (vts) %08x %08x\n",
+        av_log(NULL, AV_LOG_INFO, "last_sector (vts) %08x %08x\n",
                ifo->i->vtsi_mat->vts_last_sector,
                ifo->i->vtsi_mat->vtsi_last_sector);
         ifo->i->vtsi_mat->vts_last_sector  = bup_last_sector - 1;
@@ -1155,7 +1155,7 @@ static void update_values(IFOContext *ifo,
     }
 
     if (ifo->i->vmgi_mat) {
-        av_log(NULL, AV_LOG_WARNING, "last_sector (vmg) %08x %08x\n",
+        av_log(NULL, AV_LOG_INFO, "last_sector (vmg) %08x %08x\n",
                ifo->i->vmgi_mat->vmg_last_sector,
                ifo->i->vmgi_mat->vmgi_last_sector);
         ifo->i->vmgi_mat->vmg_last_sector  = bup_last_sector - 1;
@@ -1201,9 +1201,9 @@ static void patch_tt_srpt(IFOContext *ifo,
 
     for (i = 0; i < tt_srpt->nr_of_srpts; i++) {
         sector = title_sectors[tt_srpt->title[i].title_set_nr - 1];
-        av_log(NULL, AV_LOG_INFO, "title_set_sector %d ",
+        av_log(NULL, AV_LOG_VERBOSE, "title_set_sector %d ",
                tt_srpt->title[i].title_set_nr - 1);
-        av_log(NULL, AV_LOG_INFO|AV_LOG_C(121),
+        av_log(NULL, AV_LOG_VERBOSE|AV_LOG_C(121),
                "0x%08x -> 0x%08x\n",
                tt_srpt->title[i].title_set_sector,
                sector);
@@ -1224,17 +1224,17 @@ static void patch_c_adt(c_adt_t *c_adt, CELL *cells, int nb_cells)
                              c_adt->cell_adr_table[i].vob_id,
                              c_adt->cell_adr_table[i].cell_id);
 
-        av_log(NULL, AV_LOG_INFO, "vob_id %d, cell_id %d",
+        av_log(NULL, AV_LOG_VERBOSE, "vob_id %d, cell_id %d",
                c_adt->cell_adr_table[i].vob_id,
                c_adt->cell_adr_table[i].cell_id);
 
-        av_log(NULL, AV_LOG_INFO|AV_LOG_C(111), "s 0x%08x, 0x%08x -> ",
+        av_log(NULL, AV_LOG_VERBOSE|AV_LOG_C(111), "s 0x%08x, 0x%08x -> ",
                c_adt->cell_adr_table[i].start_sector,
                c_adt->cell_adr_table[i].last_sector);
 
         c_adt->cell_adr_table[i].start_sector = c->start_sector;
         c_adt->cell_adr_table[i].last_sector  = c->last_sector;
-        av_log(NULL, AV_LOG_INFO|AV_LOG_C(111), "s 0x%08x, 0x%08x\n",
+        av_log(NULL, AV_LOG_VERBOSE|AV_LOG_C(111), "s 0x%08x, 0x%08x\n",
                c_adt->cell_adr_table[i].start_sector,
                c_adt->cell_adr_table[i].last_sector);
     }
@@ -1262,12 +1262,12 @@ void patch_vobu_admap(vobu_admap_t *vobu_admap, VOBU *vobus, int nb_vobus)
     }
 
     for (i = 0; i < map_size; i++) {
-        av_log(NULL, AV_LOG_INFO, "admap ");
-        av_log(NULL, AV_LOG_INFO|AV_LOG_C(111),
+        av_log(NULL, AV_LOG_VERBOSE, "admap ");
+        av_log(NULL, AV_LOG_VERBOSE|AV_LOG_C(111),
                "%08x",
                vobu_admap->vobu_start_sectors[i]);
-        av_log(NULL, AV_LOG_INFO, " -> ");
-        av_log(NULL, AV_LOG_INFO|AV_LOG_C(111),
+        av_log(NULL, AV_LOG_VERBOSE, " -> ");
+        av_log(NULL, AV_LOG_VERBOSE|AV_LOG_C(111),
                "%08x\n", vobus[i].start_sector);
 
         vobu_admap->vobu_start_sectors[i] = vobus[i].start_sector;
