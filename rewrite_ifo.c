@@ -833,8 +833,9 @@ static int ifo_write_vts(IFOContext *ifo)
     if (vtsi->vts_pgcit)
         ifo_write_pgcit(pb, vtsi->vts_pgcit * DVD_BLOCK_LEN, ifo->i->vts_pgcit);
 
-    ifo_write_pgci_ut(pb, vtsi->vtsm_pgci_ut * DVD_BLOCK_LEN,
-                      ifo->i->pgci_ut);
+    if (ifo->i->pgci_ut)
+        ifo_write_pgci_ut(pb, vtsi->vtsm_pgci_ut * DVD_BLOCK_LEN,
+                          ifo->i->pgci_ut);
 
     if (ifo->i->vts_tmapt)
         ifo_write_vts_tmapt(pb, vtsi->vts_tmapt * DVD_BLOCK_LEN,
