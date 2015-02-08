@@ -164,8 +164,9 @@ do_patch_ifo(){
 
     echo rewrite_ifo ${ORIGIN} ${PATCHED}
 
-    ## Patching the rest
-    for a in ${OR}/*.IFO; do
+    ## The VIDEO_TS.IFO must be processed once one to account for the
+    ## the possible change in the IFO sizes.
+    for a in ${OR}/*.IFO ${OR}/VIDEO_TS.IFO; do
         ifo=$(basename $a)
         idx=$(basename $a | sed -e "s:VTS_\([[:digit:]]*\)_0.IFO:\1:")
         echo Processing $ifo
