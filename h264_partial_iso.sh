@@ -32,6 +32,7 @@ wipe="$3"
 ISOFILE="$1"
 DESTFILE="$2"
 WORKDIR="/mnt/work/.$(basename ${ISOFILE})_partial"
+ENCRYPTED="${WORKDIR}/encrypted"
 DVDCSS_CACHE="${WORKDIR}/dvdccs-cache"
 MOUNTPOINT="${WORKDIR}/loop"
 ORIGIN="${WORKDIR}/origin/"
@@ -57,7 +58,8 @@ do_unpack(){
     echo Unpacking the iso...
     export DVDCSS_CACHE="${DVDCSS_CACHE}"
     mkdir -p ${ORIGIN}
-    iso2vob -i ${ISOFILE} -o ${ORIGIN} -x ${XML_DESC} -e || die "iso2vob"
+    iso2vob -a http://intranet.prod.vodkaster.com/dvd2iso/authent/ -i ${ISOFILE} -o ${ORIGIN} -x ${XML_DESC} -s ${ENCRYPTED} -e || \
+        die "iso2vob -i ${ISOFILE} -o ${ORIGIN} -x ${XML_DESC} -e"
     echo iso2vob succeeded
 
     ## FIXME workaround
@@ -94,8 +96,8 @@ do_split(){
 }
 
 AVCONV="avconv"
-AVCONV_ENC="-v quiet -vsync passthrough "
-AVCONV_ENC+="-c:v libx264 -preset superfast "
+AVCONV_ENC="-v error -vsync passthrough "
+AVCONV_ENC+="-c:v libx264 -preset slow -tune film "
 AVCONV_ENC+="-c:a copy -c:s copy -map 0 -f dvd -y"
 
 do_encode(){
@@ -107,7 +109,8 @@ do_encode(){
         mkdir -p $dir
         for b in ${a}/*_d.vob; do
             name=$(basename ${b})
-            ${AVCONV} -i $b ${AVCONV_ENC} ${dir}/${name} || die "Encoding ${AVCONV} -i $b ${AVCONV_ENC} ${dir}/${name}"
+            echo encoding $b
+            ${AVCONV} -i $b ${AVCONV_ENC} ${dir}/${name} || die "avconv ${AVCONV} -i $b ${AVCONV_ENC} ${dir}/${name}"
 
 
 #            2> ${ENC_SPLIT}/log;
@@ -149,8 +152,8 @@ do_patch_nav(){
     for a in ${EU}/*.VOB; do
         name=$(basename $a)
         echo Processing $name
-        make_vob $a ${PD}/${name}.t || die $name failed
-        make_vob ${PD}/${name}.t ${PD}/${name} || die $name failed
+        make_vob $a ${PD}/${name}.t || die "makevob ${name}.t"
+        make_vob ${PD}/${name}.t ${PD}/${name} || die "makevob $name"
     done
 
     echo Copying the menus
@@ -170,7 +173,7 @@ do_patch_ifo(){
         ifo=$(basename $a)
         idx=$(basename $a | sed -e "s:VTS_\([[:digit:]]*\)_0.IFO:\1:")
         echo Processing $ifo
-        rewrite_ifo ${ORIGIN} ${PATCHED} ${idx} || die "$ifo ${ORIGIN} ${PATCHED}"
+        rewrite_ifo ${ORIGIN} ${PATCHED} ${idx} || die "rewrite_ifo $ifo ${ORIGIN} ${PATCHED}"
     done
 }
 
@@ -194,7 +197,7 @@ do_finalize(){
 
 do_make_iso(){
     echo Packing to iso...
-    mkisofs -dvd-video -o ${DESTFILE} ${OUTDIR} || die "mkisofs"
+    mkisofs -dvd-video -o ${DESTFILE} ${OUTDIR} || die "mkisofs -dvd-video -o ${DESTFILE} ${OUTDIR}"
 }
 
 do_unpack
