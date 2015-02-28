@@ -632,14 +632,12 @@ CELL *match_cell(CELL *cells, int nb_cells, int vob_id, int cell_id)
     av_log(NULL, AV_LOG_ERROR, "Cannot find cell %d-%d\n",
            vob_id, cell_id);
 
-    exit(1);
-
     return NULL;
 }
 
 static void patch_pgc(pgc_t *pgc, CELL *cells, int nb_cells)
 {
-    int i;
+    int i, missing_cell = 0;
     if (!pgc->cell_playback)
         return;
 
@@ -647,8 +645,16 @@ static void patch_pgc(pgc_t *pgc, CELL *cells, int nb_cells)
         CELL *cell = match_cell(cells, nb_cells,
                                 pgc->cell_position[i].vob_id_nr,
                                 pgc->cell_position[i].cell_nr);
-        patch_cell_playback(pgc->cell_playback + i, cell);
+        if (cell)
+            patch_cell_playback(pgc->cell_playback + i, cell);
+        else
+            missing_cell++;
     }
+    if (missing_cell > 1) {
+        av_log(NULL, AV_LOG_ERROR, "Missing %d cells, aborting.\n",
+               missing_cell);
+    }
+    pgc->nr_of_cells -= missing_cell;
 }
 
 static void patch_pgcit(pgcit_t *pgcit, CELL *cells, int nb_cells)
@@ -1202,9 +1208,9 @@ static void patch_tt_srpt(IFOContext *ifo,
 
     for (i = 0; i < tt_srpt->nr_of_srpts; i++) {
         sector = title_sectors[tt_srpt->title[i].title_set_nr - 1];
-        av_log(NULL, AV_LOG_VERBOSE, "title_set_sector %d ",
+        av_log(NULL, AV_LOG_INFO, "title_set_sector %d ",
                tt_srpt->title[i].title_set_nr - 1);
-        av_log(NULL, AV_LOG_VERBOSE|AV_LOG_C(121),
+        av_log(NULL, AV_LOG_INFO|AV_LOG_C(121),
                "0x%08x -> 0x%08x\n",
                tt_srpt->title[i].title_set_sector,
                sector);
@@ -1214,7 +1220,7 @@ static void patch_tt_srpt(IFOContext *ifo,
 
 static void patch_c_adt(c_adt_t *c_adt, CELL *cells, int nb_cells)
 {
-    int i, map_size;
+    int i, map_size, missing_cell = 0;
 
     map_size = (c_adt->last_byte + 1 - C_ADT_SIZE) / sizeof(cell_adr_t);
 
@@ -1224,20 +1230,30 @@ static void patch_c_adt(c_adt_t *c_adt, CELL *cells, int nb_cells)
         CELL *c = match_cell(cells, nb_cells,
                              c_adt->cell_adr_table[i].vob_id,
                              c_adt->cell_adr_table[i].cell_id);
+        if (c) {
+            av_log(NULL, AV_LOG_VERBOSE, "vob_id %d, cell_id %d",
+                   c_adt->cell_adr_table[i].vob_id,
+                   c_adt->cell_adr_table[i].cell_id);
 
-        av_log(NULL, AV_LOG_VERBOSE, "vob_id %d, cell_id %d",
-               c_adt->cell_adr_table[i].vob_id,
-               c_adt->cell_adr_table[i].cell_id);
+            av_log(NULL, AV_LOG_VERBOSE|AV_LOG_C(111), "s 0x%08x, 0x%08x -> ",
+                   c_adt->cell_adr_table[i].start_sector,
+                   c_adt->cell_adr_table[i].last_sector);
 
-        av_log(NULL, AV_LOG_VERBOSE|AV_LOG_C(111), "s 0x%08x, 0x%08x -> ",
-               c_adt->cell_adr_table[i].start_sector,
-               c_adt->cell_adr_table[i].last_sector);
+            c_adt->cell_adr_table[i].start_sector = c->start_sector;
+            c_adt->cell_adr_table[i].last_sector  = c->last_sector;
+            av_log(NULL, AV_LOG_VERBOSE|AV_LOG_C(111), "s 0x%08x, 0x%08x\n",
+                   c_adt->cell_adr_table[i].start_sector,
+                   c_adt->cell_adr_table[i].last_sector);
+        } else {
+            missing_cell++;
+        }
 
-        c_adt->cell_adr_table[i].start_sector = c->start_sector;
-        c_adt->cell_adr_table[i].last_sector  = c->last_sector;
-        av_log(NULL, AV_LOG_VERBOSE|AV_LOG_C(111), "s 0x%08x, 0x%08x\n",
-               c_adt->cell_adr_table[i].start_sector,
-               c_adt->cell_adr_table[i].last_sector);
+        if (missing_cell > 1) {
+            av_log(NULL, AV_LOG_ERROR, "Missing %d cells, aborting.\n",
+                   missing_cell);
+        }
+        c_adt->last_byte = (map_size - missing_cell) * sizeof(cell_adr_t) -
+                           1 + C_ADT_SIZE;
     }
 }
 
