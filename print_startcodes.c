@@ -26,7 +26,7 @@ static int print_startcodes(AVIOContext *avio)
         return AVERROR_EOF;
 
     fprintf(stderr, "Startcode : 0x%08x pos : 0x%08"PRId64" ",
-            startcode, avio_tell(avio));
+            startcode, avio_tell(avio) / DVD_BLOCK_LEN);
 
     switch (startcode) {
     case PACK_START_CODE:
