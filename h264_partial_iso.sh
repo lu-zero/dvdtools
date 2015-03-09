@@ -158,6 +158,7 @@ do_patch_nav(){
 
     echo Copying the menus
     cp "${UNSPLIT}"/*_0.VOB  "${UNSPLIT}"/*VIDEO_TS.VOB ${PD}
+    cp "${ENCRYPTED}"/VIDEO_TS/*.VOB  ${PD}
 }
 
 
