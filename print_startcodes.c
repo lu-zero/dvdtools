@@ -22,7 +22,7 @@ static int print_startcodes(AVIOContext *avio)
     int32_t header_state = 0xff;
 
     startcode = find_next_start_code(avio, &size, &header_state);
-    if (startcode < 0)
+    if (avio->eof_reached)
         return AVERROR_EOF;
 
     fprintf(stderr, "Startcode : 0x%08x pos : 0x%08"PRId64" ",
@@ -59,17 +59,24 @@ static int print_startcodes(AVIOContext *avio)
 
         if (len == NAV_PCI_SIZE) {
             parse_nav_pack(avio, &header_state, &vobu);
-
+            av_log(NULL, AV_LOG_INFO|AV_LOG_C(211),
+                   "NAV %d, vob_id %d cell_id %d\n",
+                    len, vobu.vob_id, vobu.cell_id);
+        } else {
+            av_log(NULL, AV_LOG_INFO|AV_LOG_C(212),
+                   "PS2 %d\n",
+                   len);
         }
-
-        av_log(NULL, AV_LOG_INFO|AV_LOG_C(211),
-               "NAV %d, vob_id %d cell_id %d\n",
-               len, vobu.vob_id, vobu.cell_id);
     }
     break;
     default:
         av_log(NULL, AV_LOG_INFO|AV_LOG_C(222),
-               "UNK\n");
+               "UNK startcode 0x%08x ",
+               startcode);
+        if (startcode < 0) {
+            av_log(NULL, AV_LOG_ERROR, "BROKEN BITSTREAM");
+        }
+        av_log(NULL, AV_LOG_INFO, "\n");
     }
 
     return avio->eof_reached;
