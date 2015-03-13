@@ -91,7 +91,7 @@ do_split(){
         outdir=${SPLIT}/${name}
         mkdir -p ${outdir}
         echo Processing $name
-        dump_vobu ${a} ${outdir}
+        dump_vobu ${a} ${outdir} || die "dump_vobu ${a}"
     done
 }
 
