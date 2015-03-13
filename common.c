@@ -91,8 +91,12 @@ redo:
     header_state = 0xff;
     size = MAX_SYNC_SIZE;
     startcode = find_next_start_code(pb, &size, &header_state);
-    if (startcode < 0)
-        return AVERROR_EOF;
+    if (startcode < 0) {
+        if (!pb->eof_reached) {
+            av_log(NULL, AV_LOG_ERROR, "BOGUS STARTCODE, skipping\n");
+        } else
+            return AVERROR_EOF;
+    }
 
     if (startcode == PACK_START_CODE ||
         startcode == SYSTEM_HEADER_START_CODE)
