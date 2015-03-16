@@ -94,7 +94,7 @@ redo:
     if (startcode < 0) {
         if (!pb->eof_reached) {
             av_log(NULL, AV_LOG_ERROR, "BOGUS STARTCODE, skipping\n");
-            abort();
+            goto redo;
         } else
             return AVERROR_EOF;
     }
